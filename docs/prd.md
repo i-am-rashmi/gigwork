@@ -1,282 +1,158 @@
-# GigWork — Product Requirements Document
+# GigWork — Requirements
 
-Nov 2, 2026 · @Rashmi · Status: Draft v0.1
+Status: Draft · Last updated 2026-11-11
 
-## Overview
+This doc holds the agreed problem statement and functional requirements. Non-functional requirements, components and data come next, in that order.
 
-GigWork connects people who need short-term creative and personal-service work done with nearby, available talent, starting in Bengaluru.
+## Problem statement
 
-**Problem.** In India, finding a photographer, video editor, makeup artist or mehendi artist for a specific date still runs on Instagram DMs, WhatsApp forwards and word of mouth. Posters cannot see who is free on their date or nearby. Talent misses gigs because there is no reliable way to hear about them, and reputations do not travel beyond personal networks.
+Creative and artistic talent and the people who want to hire them find each other through Instagram, other social media and word of mouth. There is no organised place where:
 
-**Product.** A portfolio-first marketplace: talent build a profile that shows their work, where they operate and when they are busy. Posters describe what they need in plain language, get structured gig posts split by category, see recommended talent close by, and publish. Matching talent are notified based on category, distance and availability.
+- **Discovery:** Posters can find suitable Talent beyond their own network.
+- **Availability:** Posters can see who is free on their date.
+- **Trust:** Posters can judge quality before hiring.
+- **Timing:** Talent hear about relevant gigs as soon as they are posted.
 
-**Focus categories.** Photography, videography, video editing, content creation, makeup, mehendi and dog walking. Home repairs and similar services are supported by the taxonomy but are not a focus.
+**Focus categories (Phase 1, fixed list):** photographers, videographers, DJs, emcees, bands and live music, content creators, mehendi artists, event curators and organisers, painting, sketching and caricature artists, makeup artists, dance choreographers, video editors and content writers. The focus is artistic and talent-based work, mostly in person.
 
-**Dual purpose.** GigWork is a portfolio project demonstrating senior backend engineering (distributed systems, data modelling, applied AI) and a candidate product. Where the two pull apart, this PRD says which one wins.
+- **Content creators** are people a brand hires to *produce* content (shooting and editing reels for a café launch, for example). Influencers paid to post to their own audience are out of scope.
+- **Groups** such as bands and orchestras have one account that represents the whole group.
+- **Remote gigs** are supported. Each category is marked by the Admin as on-site, remote or both; video editing and content writing are the remote categories at launch. A remote gig reaches Talent in every live city in India.
+- Home repairs and similar services are not a focus.
 
-## Users and personas
+**Starting city:** Bengaluru, split into 5 broad zones. GigWork is built for many cities from day one: more tier 1 cities follow, then tier 2. Adding a city is an Admin action, not a code change.
 
-Any account can both post gigs and offer talent; a talent profile is an add-on to a basic account, not a separate user type.
+## Actors
 
-| Persona | Example | Needs most | Biggest frustration today |
-| --- | --- | --- | --- |
-| Talent | Freelance wedding photographer, Jayanagar | Steady nearby gigs on dates they are free; a portfolio that does the selling | Gigs arrive late via forwards; already booked when they see them |
-| Poster (individual) | Family planning a mehendi function | Someone good, nearby, free on the date, within budget | Comparing Instagram pages and chasing replies |
-| Poster (small business) | Café owner launching a menu | A small team across several skills (shoot, edit, reels) | Does not know which roles the job needs |
-| Admin | Platform operator | Taxonomy control, moderation, dispute handling | — |
+- **Visitor:** anyone not logged in.
+- **Talent:** a user offering a service. A talent profile is an add-on to an account, not a separate account type.
+- **Poster:** a user who publishes a gig. Any account can be a Poster, and one account can be both.
+- **Admin:** the platform operator.
+- **System:** timers and background jobs (reminders, expiry, notifications).
 
-## Goals, non-goals and success metrics
+## Functional requirements
 
-**Goals**
+### Accounts and contact
 
-1. A poster goes from a one-line description to published, correctly categorised gigs in under 2 minutes.
-2. Only relevant talent are notified: right category, within their own service radius, not busy at the gig time.
-3. A talent can never be booked into two overlapping gigs.
-4. The system's behaviour under load and failure is measured and published, not assumed.
+- **FR-1** A visitor can sign up and log in. One account can both post gigs and register as Talent.
+- **FR-2** Each user chooses one or more contact methods they are willing to share (WhatsApp, phone call, email).
+- **FR-3** Every registered user verifies a phone number by OTP when signing up, whether they act as Poster, Talent or both.
 
-**Non-goals (for now)**
+### Talent profile
 
-- Pan-India launch, native mobile apps, or a fully self-serve payments product before Phase 4.
-- Hourly-wage or delivery-style gig work (drivers, riders).
-- AI that publishes or ranks without a human or deterministic step in between.
+- **FR-4** A user can register as Talent by choosing one or more categories from a fixed, pre-decided list. A Talent can hold up to 5 categories (a configurable limit). In Phase 1 there is no way to add categories from the app.
+- **FR-5** Talent set a home location, a service radius in km, and a willing-to-travel flag.
+- **FR-6** Talent add portfolio links (website, Instagram and others).
+- **FR-7** Talent add and remove busy blocks (date-time ranges when they are unavailable).
+- **FR-8** Talent's exact location is stored but never shown to other users; only locality and city are shown. Search results also show a rounded distance, e.g. "\~4 km".
 
-**Success metrics**
+### Browse and search
 
-| Metric | Target | Measured from |
-| --- | --- | --- |
-| AI draft category accuracy on the eval set | ≥ 90% | Phase 1 |
-| AI drafts that correctly ask for missing date or location | ≥ 85% | Phase 1 |
-| Talent search p99 latency on 50k profiles | < 100 ms | Phase 1 |
-| Gig publish → last notification enqueued, 3k recipients | < 5 s | Phase 2 |
-| Lost or duplicated notifications in failure tests | 0 | Phase 3 |
-| Double bookings under concurrent selection tests | 0 | Phase 2 |
+- **FR-9** Anyone, logged in or not, can browse open gigs and Talent profiles. Visitors who are not logged in never see anyone's contact details.
+- **FR-10** Browsing is filtered by one or more city zones. For a logged-in user, the default is their own zone. For a visitor, the city is detected from their IP address and all zones in that city are shown; they can then narrow to specific zones. Remote gigs appear regardless of the zones selected.
+- **FR-11** Results can be filtered by category and date; gig results also by budget.
+- **FR-12** Applying to a gig or seeing contact details requires an account.
 
-The latency and throughput targets are starting assumptions to be revised once the first load test runs.
+### Gig creation
 
-## Talent profiles
+- **FR-13** A Poster can describe a need in natural language; the AI splits it into one draft gig per category. The AI picks only from the live category list and does not recommend Talent.
+- **FR-14** If the AI cannot determine the category, date window or location, the Poster is asked; the AI never guesses these.
+- **FR-15** A Poster can create a gig with a form, which is also the fallback when the AI is unavailable.
+- **FR-16** A gig has a category, title, description, date window, an optional budget, and a work mode: on-site or remote (limited to what the category allows). An on-site gig also has a location and a yes/no flag for whether travel allowance (TA) is offered.
+- **FR-17** Drafts can be reviewed, edited or removed, then published together. Unpublished drafts are visible only to the Poster.
+- **FR-18** A Poster can edit an open gig; applicants are notified of any change to date, time or location.
+- **FR-19** A Poster can cancel an open gig. The gig shows as Cancelled on applicants' dashboards; no notification is sent, except to shortlisted Talent, who are told the gig was closed because they may be holding the date. Notifications are kept for positive or actionable news only.
 
-A talent profile is defined by four things: what they do, where they work, when they are busy, and proof of quality.
+### Matching and notifications
 
-**Requirements (Phase 1)**
+- **FR-20** When a gig is published, every Talent is notified who matches its category, has no busy block overlapping the gig's date window, and either has the gig within their service radius or is willing to travel to a gig that offers TA. For a remote gig, location is ignored: every Talent in the category, in any live city, who has no overlapping busy block is notified.
+- **FR-21** A Talent is notified at most once per gig, even if the system retries.
+- **FR-22** Talent have a dashboard listing open gigs that match them and gigs they have applied to. Users who are not Talent see an option to register as Talent instead.
 
-- **Categories:** one or more from a fixed, admin-managed taxonomy (about 15 at launch). Talent cannot create categories. Sub-skills (e.g. Photography → wedding, product, portrait) are not categories for now; the data model leaves room to add them later without a migration of existing gigs.
-- **Service area:** a home base (lat/lng, set by map pin, shown publicly only as locality) plus a service radius in km. "Willing to travel" extends matching beyond the radius, optionally with a travel fee note.
-- **Availability:** talent are available by default and mark *busy blocks* (date-time ranges). Selection for a gig creates a busy block automatically. A recurring weekly unavailability (e.g. "no Mondays") is supported.
-- **Portfolio:** images, video links (YouTube, Instagram, Drive) and short project descriptions, uploaded via presigned URLs; image thumbnails generated asynchronously.
-- **Rates:** indicative price range per category (e.g. ₹15,000–40,000 per wedding day). Optional, not binding.
-- **Profile completeness score** used in ranking and shown to the talent as a nudge.
+### Applications, shortlisting and hiring
 
-**Later**
+- **FR-23** Talent can apply to an open gig with an optional note, once per gig, and can withdraw the application.
+- **FR-24** A Poster sees each application with the applicant's profile and portfolio links.
+- **FR-25** A Poster can shortlist one or more applicants; shortlisted Talent are notified.
+- **FR-26** Once a Talent is shortlisted, the Poster and that Talent can see each other's chosen contact methods, for that gig only. Either side can reach out first.
+- **FR-27** A Poster can mark one shortlisted Talent as hired. The gig becomes Filled, the hired Talent gets a busy block for the gig's date window, and the gig shows as Closed on the other applicants' dashboards. They are not sent a notification.
+- **FR-28** A shortlisted Talent can mark "I've been hired for this". The Poster is asked to confirm with one tap; on confirmation, FR-27 applies.
+- **FR-29** The system prevents a Talent from holding two overlapping hires recorded in the app. Hires agreed offline and never recorded in the app are not covered.
 
-- Verified identity badge (Phase 4), reliability score (Phase 4), Google Calendar sync for busy blocks (backlog).
+### Closing gigs
 
-**Acceptance**
+- **FR-30** The Poster is reminded to update the gig's status. Reminders go out 48 hours after the first shortlisting and one day before the gig starts.
+- **FR-31** A gig with no hire closes automatically as Expired when its start time passes.
+- **FR-32** When a gig is closed, the Poster is asked the outcome: hired on GigWork, hired elsewhere, or not hired.
 
-- A profile with no busy blocks is matched for any date.
-- Exact coordinates never appear in any API response visible to another user.
+### Admin
 
-## Search and discovery
-
-Anyone, signed in or not, can search talent and open gigs; contacting or applying requires an account.
-
-**Talent search filters:** category, distance from a chosen point (default 10 km), available on a date or date range, price range, minimum rating (Phase 4), willing to travel.
-
-**Gig search filters:** category, distance, date range, budget range, status (open by default).
-
-**Ranking (Phase 1):** a deterministic score combining distance, profile completeness and recency of activity. Weights live in config so they can be tuned without a deploy. Phase 3 adds embedding similarity as one more signal, measured against this baseline.
-
-**Results** show locality and distance, never exact location. Pagination is cursor-based.
-
-**Implementation note:** Postgres full-text search plus PostGIS covers the expected scale. A dedicated search engine is only introduced if a measured query shows Postgres falling short.
-
-## Gig lifecycle
-
-A gig moves through six states, and only the transitions shown are allowed; the state machine is enforced in the domain layer and every transition is an audited event.
-
-&#91;embedded content: gig lifecycle · 6 states\]
-
-**Requirements**
-
-- **Post (Phase 1):** manual form or AI drafts. Required: category, title, description, schedule, location, budget range. A schedule is a single date-time, a time window, or a span of several days; availability matching and busy blocks check every part of it.
-- **Close:** a poster can withdraw an Open gig (Cancelled). Open gigs with no selection move to Expired automatically when the start time passes.
-- **Edit:** allowed while Open; changes to date, time or location notify existing applicants.
-- **Gig group:** gigs created from one AI request share a group id so the poster can manage them together.
-- Every transition is idempotent and records who triggered it and when.
-
-Draft also covers AI drafts the poster has not yet published; unpublished drafts are deleted after 14 days.
-
-## AI gig drafting and recommendations
-
-The AI turns one free-text request into reviewable gig drafts, one per category; it never publishes and never ranks talent.
-
-**Flow**
-
-1. Poster types a request, e.g. "Looking for people to help with videography, editing and content for our café launch on 14 Dec in Indiranagar." English, Hindi, Kannada and mixed-language input are accepted.
-2. The LLM returns structured output constrained by a JSON schema: an array of drafts, each with `category` (enum from the taxonomy), title, description, date/time window, location text, budget range, required skills, and a list of `missing_fields`.
-3. If date, location or budget is missing, the UI asks the poster rather than the model guessing.
-4. The poster edits, removes or adds drafts, then publishes them together as a linked **gig group** (one request, several gigs).
-5. For each draft, the backend shows recommended talent: SQL filter (category, within talent radius, no busy-block overlap), then the deterministic ranking from Search.
-
-**Quality and operations**
-
-- An eval set of 40–50 prompts with expected categories and missing fields runs in CI; accuracy is reported per release.
-- Every call logs model, tokens, cost, latency and outcome (accepted, edited, discarded).
-- Timeout of 10 s with a fallback to the manual posting form. Identical prompts within 24 h are served from cache.
-- Prompts and schema are versioned; a schema change requires the eval to pass.
-
-**Later:** embedding-based talent ranking (Phase 3); AI-suggested budget ranges from past gigs (backlog); AI portfolio tagging (backlog).
-
-## Matching and notifications
-
-When a gig is published, every talent in its category whose service radius covers the gig location and who is not busy at the gig time is notified exactly once.
-
-**Matching rule:** `category ∈ talent.categories` AND (`distance(gig, talent.base) ≤ talent.radius_km` OR `talent.willing_to_travel`) AND no busy block overlaps the gig window. The talent's radius governs, not the poster's.
-
-**Pipeline (Phase 2)**
-
-1. Gig published → row written to an outbox table in the same transaction.
-2. Outbox relay (polling, or Debezium CDC) publishes `GigPublished` to Kafka.
-3. Matching worker runs the matching query in pages and emits one `NotifyTalent` event per recipient, keyed by talent id.
-4. Channel workers deliver via in-app and email first; push and WhatsApp later.
-
-**Rules**
-
-- Idempotency key = (gig id, talent id, channel). A redelivered event never produces a second message.
-- No daily cap: every matching gig notifies the talent, so no opportunity is missed. The notification badge shows a count (e.g. 9+), and the talent dashboard lists every match.
-- Talent can mute categories or set quiet hours.
-- Failed deliveries retry with backoff, then move to a dead-letter topic with an admin view.
-- A talent who clears a busy block after publish is **not** retro-notified in Phase 2; they will see the gig in search. Revisit in Phase 3.
-
-**Gig updates and cancellations** notify applicants, not the original broadcast list.
-
-**Talent dashboard:** a home view of every open gig that matches the talent's categories, radius and availability, newest first, with no cap. Each entry shows category, schedule, distance, budget range and whether they have applied. It is the full record behind the notifications, so a talent who missed an alert still sees the gig.
-
-## Applications, selection and booking
-
-A poster selects exactly one applicant per gig, and the system guarantees that a talent cannot hold two overlapping bookings.
-
-**Requirements (Phase 2)**
-
-- Talent apply with a short note and an optional quote. One application per talent per gig. Posters see each applicant's quote before selecting.
-- Posters can also invite a recommended talent directly; the invite becomes an application when accepted.
-- Selecting an applicant creates a booking, a busy block for the talent, and moves the gig to Filled. Other applicants are notified.
-- Talent must confirm a selection within 12 hours, or the booking lapses and the gig returns to Open.
-- **Double-booking guarantee:** enforced in the database (e.g. a Postgres exclusion constraint on talent id + time range), not only in application code. A test fires concurrent selections of one talent for overlapping gigs and asserts exactly one succeeds.
-- Selection is idempotent: retrying the same request returns the same booking.
-
-**Messaging:** basic poster–applicant chat after an application exists (Phase 4). Until then, contact details are revealed only after selection.
-
-## Payments and escrow
-
-Posters pay into escrow on confirmation, and the platform releases funds to talent after the gig is marked complete (Phase 4, test mode).
-
-- Payment gateway in test mode (e.g. Razorpay); UPI and cards.
-- Funds held until the poster marks complete, or auto-released 72 hours after the gig ends if no dispute is raised.
-- **Double-entry ledger** table: every movement (charge, hold, release, refund, fee) is a balanced pair of entries. Balances are derived, never stored as a mutable number.
-- Gateway webhooks are processed idempotently using the gateway's event id; out-of-order webhooks are handled.
-- Platform fee: a configurable percentage, shown before payment.
-- Refunds follow the cancellation policy in the next section.
-
-Real money movement, KYC and payouts to bank accounts are out of scope until GigWork is run as a business.
-
-## Reviews, reliability and cancellation
-
-Reliability (showing up as booked) is tracked separately from quality (star rating), because a no-show costs a poster more than an average shoot.
-
-**Reviews:** both sides rate each other 1–5 with an optional comment, only after a completed booking. Reviews are hidden until both submit or 7 days pass, to avoid retaliation.
-
-**Reliability score:** completed bookings divided by confirmed bookings, with late cancellations and no-shows counted against it. Shown as a badge after 3 completed gigs.
-
-**Cancellation policy (draft)**
-
-| Who cancels | When | Effect |
-| --- | --- | --- |
-| Poster | > 72 h before | Full refund |
-| Poster | ≤ 72 h before | 50% to talent |
-| Talent | > 72 h before | No penalty beyond reliability count |
-| Talent | ≤ 72 h before or no-show | Full refund to poster; reliability hit; repeat offenders suspended |
-
-The percentages and windows are placeholders to validate with real talent before Phase 4.
-
-## Trust, safety and privacy
-
-Many gigs in the focus categories mean a talent travelling to a stranger's home, so location privacy and poster accountability are product requirements, not extras.
-
-- Talent exact location is never exposed; search shows locality and rounded distance.
-- Gig exact address is revealed to the selected talent only, after confirmation.
-- Phone numbers are hidden until a booking is confirmed.
-- Posters must verify a phone number (OTP) before publishing; verified-identity badge for both sides in Phase 4.
-- Report and block on profiles, gigs and messages, with an admin moderation queue.
-- Portfolio uploads are scanned for file type and size; profanity and contact-detail filtering on gig text to keep deals on-platform.
-- Data retention: deleted accounts are anonymised within 30 days; the ledger keeps anonymised entries.
-- Compliance with India's Digital Personal Data Protection Act to be reviewed before any real launch.
+- **FR-33** An Admin can add, rename and retire categories.
+- **FR-34** An Admin can add a city, define its zones, and switch the city live. Only live cities appear in browsing, search and sign-up.
+- **FR-35** Users can report a gig or profile, and an Admin can hide it.
 
 ## Non-functional requirements
 
-| Area | Requirement |
-| --- | --- |
-| Architecture | Modular monolith (Spring Boot), modules: identity, profiles, gigs, matching, notifications, payments. Kafka for async work only. |
-| Data | PostgreSQL + PostGIS as the system of record; Redis for caching and rate limits; S3 for media. |
-| Performance | Talent search p99 < 100 ms at 50k profiles; API p99 < 300 ms excluding AI calls. |
-| Reliability | No lost or duplicated notifications; outbox for every event that must follow a DB write. |
-| Idempotency | Keys on selection, notification send, payment webhooks. |
-| Observability | OpenTelemetry traces across API → Kafka → workers; metrics dashboard incl. consumer lag; structured logs with trace ids. |
-| Security | JWT auth, role checks per endpoint, secrets in AWS Secrets Manager, rate limiting per IP and user. |
-| Testing | Unit + Testcontainers integration tests in CI; AI eval suite; k6 load tests per phase. |
-| Cost | Stay under roughly $30/month on AWS outside load-test days; no managed Kafka. |
-| Documentation | ADR for every significant decision; README with architecture diagram, numbers and demo video. |
+NFRs are written for the whole app and tagged with the phase from which each applies. Every NFR states how it is measured. Design targets are about 10× the realistic estimate, so load tests run at the design target.
 
-## Future features and improvements
+### Scale
 
-Ranked by how likely they are to be built next once Phase 4 ships; the first group is near-certain if GigWork continues as a product.
+| ID | Requirement | From phase | Measured by |
+| --- | --- | --- | --- |
+| NFR-1 | 50,000 Talent profiles per city; 250,000 across 5 cities | 1 | Seeded dataset; all latency targets are measured at this size |
+| NFR-2 | 1,500 gigs published per day per city at peak (wedding season) | 1 | Load test |
+| NFR-3 | On-site fan-out: about 4,000 recipients per gig typically, 9,000 worst case | 2 | Load test |
+| NFR-4 | Remote fan-out: up to 30,000 recipients for one gig | 2 | Load test |
+| NFR-5 | 3 million notifications per day per city at peak | 2 | Load test |
+| NFR-6 | 300 concurrent users and 100 API requests per second per city (500 across 5 cities) | 1 | Load test |
 
-**Likely next (after Phase 4)**
+**How these were estimated.** Bengaluru has about 1.4 crore people, around 1% of India, and India has roughly 1 crore weddings a year (CAIT estimates about 46 lakh in the Nov–Dec 2025 season alone), so about 90,000 weddings a year involve Bengaluru families. Each wedding hires about 4.5 of the focus skills, and non-wedding events roughly double that, giving about 8 lakh gigs a year in the city's market. Dividing demand by how many jobs one practitioner handles a year gives about 44,000 practitioners across the 13 categories. GigWork is assumed to reach 10–20% of practitioners and 1–2% of gigs within 2–3 years; design targets are 10× that. Fan-out uses geometry: a 10 km radius covers about 40% of Bengaluru's roughly 741 km², and a remote gig reaches a whole category across five cities.
 
-| Feature | Why | Size |
-| --- | --- | --- |
-| WhatsApp notifications and replies | Where the talent pool actually lives | M |
-| Google Calendar sync for busy blocks | Keeps availability fresh without effort | M |
-| Team booking for gig groups | Book a photographer + editor + reel creator as one package | L |
-| Saved searches and alerts for posters | "Tell me when a mehendi artist near HSR frees up on 20 Jan" | S |
-| Talent analytics | Profile views, notification-to-apply rate, earnings | S |
+**What the numbers show:** API load is modest (about 100 requests a second per city). The hard problem is burst fan-out: a single remote gig can produce about 30,000 notifications within seconds.
 
-**Possible**
+### Performance
 
-| Feature | Why | Size |
-| --- | --- | --- |
-| AI budget suggestion from past gigs | Posters rarely know market rates | M |
-| AI portfolio tagging and style search | "Candid, pastel wedding photography" | L |
-| Recurring gigs | Weekly dog walking, monthly content shoots | M |
-| Agency accounts | One studio managing several talents | M |
-| Seasonal demand forecasting | Wedding season spikes; nudge talent to update calendars | M |
-| Native mobile apps | Push reliability, camera uploads | L |
+All latencies are server-side, measured as percentiles at the design scale (NFR-1, NFR-6). "Queued" means handed to the delivery system; delivery time inside email or WhatsApp providers is not counted.
 
-**Unlikely unless the business case appears:** subscriptions for talent, ads, expansion beyond Bengaluru, real payouts and KYC.
+| ID | Requirement | From phase | Measured by |
+| --- | --- | --- | --- |
+| NFR-7 | Simple reads (profile, gig page, dashboard): p95 < 200 ms, p99 < 500 ms | 1 | Load test at NFR-6 traffic |
+| NFR-8 | Writes (apply, shortlist, hire): p95 < 300 ms | 1 | Load test |
+| NFR-9 | Search with category, date and distance filters: p95 < 300 ms at 50,000 profiles | 3 | Load test |
+| NFR-10 | Gig publish to first notification queued: < 5 s | 2 | Trace from publish to first queued message |
+| NFR-11 | Gig publish to last notification queued, on-site worst case (9,000 recipients): < 15 s | 2 | Load test; about 600 notifications/s |
+| NFR-12 | Gig publish to last notification queued, remote worst case (30,000 recipients): < 60 s | 2 | Load test; about 500 notifications/s |
+| NFR-13 | AI gig drafting: p95 < 8 s; hard timeout 10 s, then fall back to the form (FR-15) | 4 | Latency logged per AI call |
 
-## Risks and open questions
+**Basis:** reads and writes come from a latency budget (a few indexed queries take tens of milliseconds; p95 allows 3–10× for tail effects) within the \~1 s a page can take before it feels slow on mobile. Notification targets come from the timing pain (Talent must hear within seconds) and are converted into throughput. The AI timeout sits at the \~10 s limit of user attention. See *How to estimate NFRs* for the method. All targets are revised after the first load test.
 
-**Risks**
+## Phases
 
-- **Scope versus job hunt:** interview prep competes for time from December. Mitigation: Phase 1 is fixed; Phases 2–4 may slip.
-- **Stale availability:** if talent stop updating busy blocks, notifications become noise. Mitigation: busy-by-exception model, auto-blocks on booking, calendar sync in backlog.
-- **AI miscategorisation:** a wrong category notifies the wrong people. Mitigation: enum-constrained output, human review, eval in CI.
-- **Cold start:** no real users at launch. Mitigation: 50k seeded profiles for engineering work; real users only if the product track is pursued.
-- **AWS cost creep** from Kafka, RDS and load tests. Mitigation: self-hosted Kafka, tear-down scripts, billing alarm.
+GigWork is built in vertical slices: Phase 1 delivers a thin but complete path from posting a gig to hiring someone, and each later phase improves that working path rather than adding a disconnected area.
 
-**Open questions**
+| Phase | Theme | Requirements | Demo at the end |
+| --- | --- | --- | --- |
+| 1 | Core loop, form-based | FR-1, FR-2, FR-3, FR-4 to FR-8, FR-15, FR-16, FR-18, FR-19, a plain list of open gigs (basic FR-9), FR-23 to FR-27, FR-29, FR-31. Categories, cities and zones loaded as seed data. | One gig goes from posted to applied, shortlisted and hired |
+| 2 | Matching and notifications | FR-20, FR-21, FR-22, FR-28, FR-30, FR-32 | Publishing a gig notifies matching Talent within seconds; Java vs Go fan-out benchmark |
+| 3 | Browse and search | Full FR-9, FR-10, FR-11, FR-12, FR-33, FR-34, FR-35 | Anyone can find Talent and gigs by zone, category and date |
+| 4 | AI gig creation | FR-13, FR-14, FR-17, then F-6 | One sentence becomes reviewed, published gigs |
 
-- [x] Final category taxonomy and whether categories have sub-skills (e.g. Photography → wedding, product, portrait).
+## Future scope
 
-  Decided: no sub-skills for now; keep the design open to add them.
-- [x] Is a gig a single date-time window, or can it span multiple days?
+- **F-1** In-app chat between a Poster and shortlisted Talent.
+- **F-2** In-app payments.
+- **F-3** Reviews and ratings.
+- **F-4** Promoted (paid) Talent, shown as clearly labelled recommendations alongside AI drafts.
+- **F-5** An AI-assisted portfolio builder inside the app.
+- **F-6 (Phase 2) Category proposals.** A Talent who can't find their category can propose one. The proposal is held as not-live: the Talent isn't matched or found under it yet. An AI evaluation checks it for duplicates and synonyms of existing categories, fit with the focus (artistic and talent-based work) and policy problems, and records pros and cons. A clear, non-duplicate proposal is created automatically, even if only one Talent proposed it, and becomes available to AI drafting straight away. Anything with a conflict or low confidence goes to an Admin for approval.
 
-  Decided: a single date-time, a window, or several days.
-- [x] Should posters see applicant quotes before selecting, or only after?
+## Open questions
 
-  Decided: before selecting.
-- [x] Notification cap per day: 5 is a guess; what do real talent want?
+- Which cities come after Bengaluru, and on what criteria (a business decision; the design only needs to support many cities).
 
-  Decided: no cap. Badge shows a count (9+); the dashboard lists every match.
-- [x] Retro-notify talent who free up after a gig is published?
+## Next
 
-  Decided: later, not in the first release.
+1. Non-functional requirements, with numbers.
+2. Components.
+3. Data: entities, access patterns and guarantees, then the datastore decision (SQL vs NoSQL) as an ADR.
+4. Recheck ADR-0001 against the components.
