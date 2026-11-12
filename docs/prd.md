@@ -36,21 +36,21 @@ Creative and artistic talent and the people who want to hire them find each othe
 
 - **FR-1** A visitor can sign up and log in using either their mobile number or their email address, with a one-time code (OTP). One account can both post gigs and register as Talent.
 - **FR-2** Each user chooses one or more contact methods they are willing to share (WhatsApp, phone call, email).
-- **FR-3** Every registered user verifies a mobile number by OTP when signing up, whether they act as Poster, Talent or both. An email address is verified later, by OTP while the user is logged in, the first time it is needed. The system records whether each mobile number and email address is verified. Login by email OTP and email notifications work only for a verified email address.
-- **FR-3a** A user can delete their own account. Their personal data is erased within 30 days; gigs and applications they took part in are kept in anonymised form.
+- **FR-3** Every registered user verifies a mobile number by OTP when signing up, whether they act as Poster, Talent or both. An email address is verified later, by OTP while the user is logged in, the first time it is needed. The system records whether each mobile number and email address is verified. Login by email OTP and email notifications work only for a verified email address. Talent are prompted to verify their email so they can also receive gig notifications by email. Until a frontend or mobile app exists, notifications go to the in-app inbox and, where verified, email; push notifications come with the app.
+- **FR-3a** A user can delete their own account after a fresh OTP. Immediately, their sessions end, their profile is hidden, their open gigs and applications are cancelled or withdrawn, contact reveals end, and any upcoming confirmed hires are cancelled with the other side notified. For 30 days, logging in again offers to restore the account (cancelled gigs and hires stay cancelled). After 30 days, personal data is erased; gigs and applications they took part in are kept in anonymised form.
 
 ### Talent profile
 
 - **FR-4** A user can register as Talent by choosing one or more categories from a fixed, pre-decided list. A Talent can hold up to 5 categories (a configurable limit). In Phase 1 there is no way to add categories from the app.
-- **FR-5** Talent set a home location (by locality, PIN code or map pin; stored as coordinates, never as a street address), a service radius in km, and a willing-to-travel flag.
+- **FR-5** Talent set a home location (by locality, PIN code or map pin; stored as coordinates, never as a street address), a service radius of 1–50 km, and a willing-to-travel flag. A home location outside every zone is assigned the nearest city and zone for browsing; matching uses the actual location. A profile is marked as an individual or a group (with an optional member count).
 - **FR-6** Talent add portfolio links (website, Instagram and others).
-- **FR-7** Talent add and remove busy blocks (date-time ranges when they are unavailable).
+- **FR-7** Talent add and remove busy blocks (date-time ranges when they are unavailable; a block can be marked all-day).
 - **FR-8** Talent's exact location is stored but never shown to other users; only locality and city are shown. Search results also show a rounded distance, e.g. "\~4 km".
 
 ### Browse and search
 
 - **FR-9** Anyone, logged in or not, can browse open gigs and Talent profiles. Visitors who are not logged in never see anyone's contact details.
-- **FR-10** Browsing is filtered by one or more city zones. For a logged-in user, the default is their own zone. For a visitor, the city is detected from their IP address and all zones in that city are shown; they can then narrow to specific zones. Remote gigs appear regardless of the zones selected.
+- **FR-10** Browsing is filtered by one or more city zones. For a logged-in user, the default is their own zone. For a visitor, the city is detected from their IP address and all zones in that city are shown; they can then narrow to specific zones. Remote gigs appear regardless of the zones selected. A Talent can save preferred cities or zones as their default filter for browsing gigs; this does not affect notifications.
 - **FR-11** Results can be filtered by category and date; gig results also by budget.
 - **FR-12** Applying to a gig or seeing contact details requires an account.
 
@@ -59,10 +59,10 @@ Creative and artistic talent and the people who want to hire them find each othe
 - **FR-13** A Poster can describe a need in natural language; the AI splits it into one draft gig per category. The AI picks only from the live category list and does not recommend Talent.
 - **FR-14** If the AI cannot determine the category, date window or location, the Poster is asked; the AI never guesses these.
 - **FR-15** A Poster can create a gig with a form, which is also the fallback when the AI is unavailable.
-- **FR-16** A gig has a category, title, description, date window, an optional budget, and a work mode: on-site or remote (limited to what the category allows). An on-site gig also has a location (chosen the same way; no street address is collected) and a yes/no flag for whether travel allowance (TA) is offered.
-- **FR-17** Drafts can be reviewed, edited or removed, then published together. Unpublished drafts are visible only to the Poster.
+- **FR-16** A gig has a category, title, description, a start and end date and time (it may span several days), an optional budget range (minimum and maximum; equal for a fixed amount), and a work mode: on-site or remote (limited to what the category allows). An on-site gig also has a location (chosen the same way; no street address is collected) and a yes/no flag for whether travel allowance (TA) is offered.
+- **FR-17** Drafts can be reviewed, edited or removed, then published together. Drafts are not saved on the server: until the Poster publishes, they exist only in the Poster's session. The AI drafting session (request text with contact details masked, model output, prompt and model version) is kept for 14 days for evaluation and debugging.
 - **FR-18** A Poster can edit an open gig; applicants are notified of any change to date, time or location.
-- **FR-19** A Poster can cancel an open gig. The gig shows as Cancelled on applicants' dashboards; no notification is sent, except to shortlisted Talent, who are told the gig was closed because they may be holding the date. Notifications are kept for positive or actionable news only.
+- **FR-19** A Poster can cancel an open or filled gig. A filled gig can't be edited, only cancelled; cancelling it also cancels the hire, releases the Talent's booking and notifies the hired Talent. Gigs are never permanently deleted: cancelled gigs are kept for history. The gig shows as Cancelled on applicants' dashboards; no notification is sent, except to shortlisted Talent, who are told the gig was closed because they may be holding the date. Notifications are kept for positive or actionable news only.
 
 ### Matching and notifications
 
@@ -72,14 +72,15 @@ Creative and artistic talent and the people who want to hire them find each othe
 
 ### Applications, shortlisting and hiring
 
-- **FR-23** Talent can apply to an open gig with an optional note, once per gig, and can withdraw the application.
-- **FR-24** A Poster sees each application with the applicant's profile and portfolio links.
+- **FR-23** Talent can apply to an open gig with an optional note, once per gig, and can withdraw the application. A Talent can apply only if the gig's category is on their profile, and can't apply to their own gig. If the Talent has a busy block overlapping the gig's dates, applying is allowed but they are shown a warning; the double-booking rule still applies at hire (FR-29). Withdrawing a shortlisted application also ends any contact reveal (as in FR-25a).
+- **FR-24** A Poster sees each application with the applicant's profile and portfolio links. The Poster receives a summary of new applications for a gig (e.g. "3 new applications for your Photography gig") at most once every few hours, rather than one notification per application.
 - **FR-25** A Poster can shortlist one or more applicants and, when shortlisting, chooses yes or no to sharing their own contact details with that Talent. Shortlisted Talent are notified.
 - **FR-25a** A Poster can remove a Talent from the shortlist. From that moment the Poster and that Talent can no longer see each other's contact details in the app (details already saved outside the app can't be recalled). No notification is sent; the Talent's dashboard shows the application as not shortlisted.
-- **FR-26** Contact details are revealed only with consent, for that gig only. A shortlisted Talent sees the Poster's chosen contact methods if the Poster chose to share them. Talent have a Shortlisted tab where they can accept to reveal their own contact methods to that Poster; the Poster sees them only after the Talent accepts.
-- **FR-27** A Poster can mark one shortlisted Talent as hired. The gig becomes Filled, the hired Talent gets a busy block for the gig's date window, and the gig shows as Closed on the other applicants' dashboards. They are not sent a notification.
-- **FR-28** A shortlisted Talent can mark "I've been hired for this". The Poster is asked to confirm with one tap; on confirmation, FR-27 applies.
-- **FR-29** The system prevents a Talent from holding two overlapping hires recorded in the app. Hires agreed offline and never recorded in the app are not covered.
+- **FR-26** Contact details are revealed only with consent, for that gig only. A shortlisted Talent sees the Poster's chosen contact methods if the Poster chose to share them. Talent have a Shortlisted tab where they can accept to reveal their own contact methods to that Poster; the Poster sees them only after the Talent accepts. The Poster can change their share choice either way at any time, and the Talent can withdraw their consent at any time; in-app access ends immediately and no notification is sent. Every view of a contact is recorded in a contact access log (who viewed whose contact, for which gig, when), kept for 1 year. Contact details are never copied: they are fetched from Identity at each view, after the consent check.
+- **FR-27** A Poster can mark one shortlisted Talent as hired. The hire is pending until the Talent confirms it within 24 hours; if they don't, it lapses and the gig stays open. On confirmation, in one transaction, the gig becomes Filled, the Talent gets a booking for the gig's dates, and the gig shows as Closed on the other applicants' dashboards (they are not sent a notification). While a hire is pending, the gig stays open. A gig can have only one pending hire at a time; the Poster can withdraw a pending hire at any time, and the Talent can decline it straight away instead of letting it lapse. Applications are kept for history (anonymised if an account is erased).
+- **FR-27a** Either side can cancel a confirmed hire, giving a reason. The Talent's booking is released immediately, the other side is notified, and if the gig's start time is still in the future the gig reopens so the Poster can hire someone else. Reasons are recorded for future reliability scores.
+- **FR-28** A shortlisted Talent can mark "I've been hired for this". The Poster confirms within 24 hours; on confirmation, the same step as in FR-27 applies. Either side can start a hire, and the other side must confirm it.
+- **FR-29** The system prevents a Talent from holding two overlapping confirmed hires, enforced by the database even for simultaneous requests. Only hires block hires: a Talent's manual busy blocks don't prevent a hire; they are simply covered by the booking. Hires agreed offline and never recorded in the app are not covered.
 
 ### Closing gigs
 
@@ -126,7 +127,7 @@ All latencies are server-side, measured as percentiles at the design scale (NFR-
 | NFR-10 | Gig publish to first notification queued: < 5 s | 2 | Trace from publish to first queued message |
 | NFR-11 | Gig publish to last notification queued, on-site worst case (9,000 recipients): < 15 s | 2 | Load test; about 600 notifications/s |
 | NFR-12 | Gig publish to last notification queued, remote worst case (30,000 recipients): < 60 s | 2 | Load test; about 500 notifications/s |
-| NFR-13 | AI gig drafting: p95 < 8 s; hard timeout 10 s, then fall back to the form (FR-15) | 4 | Latency logged per AI call |
+| NFR-13 | AI gig drafting: p95 < 8 s; hard timeout 10 s, then fall back to the form (FR-15) | 1 | Latency logged per AI call |
 
 **Basis:** reads and writes come from a latency budget (a few indexed queries take tens of milliseconds; p95 allows 3–10× for tail effects) within the \~1 s a page can take before it feels slow on mobile. Notification targets come from the timing pain (Talent must hear within seconds) and are converted into throughput. The AI timeout sits at the \~10 s limit of user attention. See *How to estimate NFRs* for the method. All targets are revised after the first load test.
 
@@ -253,7 +254,7 @@ Observability is what makes every "measured by" column possible. Thresholds belo
 | NFR-60 | Distributed tracing with OpenTelemetry: every gig publish is traced end to end; ordinary reads are sampled at 10% during load tests | 2 | Trace present for every publish in a test run |
 | NFR-61 | Dashboards exist for each NFR group (performance, fan-out, reliability) | 2 | Review |
 | NFR-62 | Alerts by email on NFR breaches: p95 latency above target, error rate above 1%, outbox backlog older than 30 s, consumer lag growing for 2 minutes, a scheduled action overdue by more than 2 minutes | 2 | Trigger each alert in a test |
-| NFR-63 | Business events are recorded from Phase 1: gig posted, application submitted, shortlisted, hire outcome (FR-32), so applications per gig, fill rate and time to first application can be measured | 1 | Event counts match test actions |
+| NFR-63 | Business events are recorded from Phase 1. State changes (gig posted, application submitted, shortlisted, hire outcome) reuse the outbox events, which carry the fields analytics needs; activity signals (views, searches, profile opens) are sent separately and directly to analytics, where some loss is acceptable. This lets applications per gig, fill rate and time to first application be measured | 1 | Event counts match test actions |
 | NFR-64 | Before an environment is destroyed, load-test results and dashboard snapshots are saved to the repository | 2 | Results present in the repo after each run |
 
 ### Testing and maintainability
@@ -272,16 +273,31 @@ Much of the code is written by an AI coding agent and reviewed by a human, so au
 | NFR-72 | The README gives one-command local setup and demo-pipeline instructions, and an ADR index is kept up to date | 1 | Fresh-machine setup |
 | NFR-73 | Dependency updates arrive as automated pull requests and pass the same CI | 1 | Update PRs present |
 
+### AI
+
+An LLM is slow, costs money per call, can be wrong in plausible-looking ways, and treats any text it receives as potential instructions. These NFRs set how good the AI must be, how that is proven, what it may see and do, and what it costs. Latency is covered by NFR-13.
+
+| ID | Requirement | From phase | Measured by |
+| --- | --- | --- | --- |
+| NFR-74 | Quality is proven on an evaluation set of about 50 realistic English requests with expected drafts: correct categories in at least 90% of cases, correct dates and locality in at least 90%, and no invented values (when a date or location is missing the AI asks, never guesses; FR-14) | 1 | Eval run scores |
+| NFR-75 | The evaluation set is re-run on every prompt or model change, and a change is released only if its scores are at least as good as the current version | 1 | Eval results stored with each change |
+| NFR-76 | The model returns structured output validated against a schema, with categories only from the live category list. Invalid output is retried once, then the Poster is asked for the missing details or falls back to the form | 1 | Tests with malformed model responses |
+| NFR-77 | Only the Poster's request text is sent to the model; mobile numbers and email addresses found in it are masked before sending. The provider must not train on GigWork's data | 1 | Tests on outgoing requests; provider terms |
+| NFR-78 | The model has no tools and cannot take actions: it only returns drafts, and nothing is published until the Poster reviews it (FR-17). A manipulated prompt can at worst produce an odd draft that a human sees | 1 | Design review; prompt-injection test cases in the eval set |
+| NFR-79 | Each user can create at most 20 successful AI drafts per day; failed calls (timeouts, invalid output) don't count, but a separate technical cap of 50 model calls per user per day protects against abuse; AI spend has a target cost per draft and a monthly hard cap (NFR-56) | 1 | Integration test; cost tracking |
+| NFR-80 | Every draft records the prompt version and model version that produced it; prompts are versioned in the repository | 1 | Draft records |
+| NFR-81 | English only in the first release | 1 | Eval set language |
+
 ## Phases
 
 GigWork is built in vertical slices: Phase 1 delivers a thin but complete path from posting a gig to hiring someone, and each later phase improves that working path rather than adding a disconnected area.
 
 | Phase | Theme | Requirements | Demo at the end |
 | --- | --- | --- | --- |
-| 1 | Core loop, form-based | FR-1, FR-2, FR-3, FR-4 to FR-8, FR-15, FR-16, FR-18, FR-19, a plain list of open gigs (basic FR-9), FR-23 to FR-27, FR-29, FR-31. Categories, cities and zones loaded as seed data. | One gig goes from posted to applied, shortlisted and hired |
+| 1 | Core loop + AI gig drafting (API only) | FR-1, FR-2, FR-3, FR-3a, FR-4 to FR-8, FR-15, FR-16, FR-18, FR-19, a plain list of open gigs (basic FR-9), FR-23 to FR-27, FR-29, FR-31, FR-36. Then, after the walking skeleton works end to end, AI gig drafting: FR-13, FR-14, FR-17. Categories, cities and zones loaded as seed data. No frontend: demoed through the API (Swagger and a request collection). | One gig goes from posted (by form or from one sentence via AI) to applied, shortlisted and hired |
 | 2 | Matching and notifications | FR-20, FR-21, FR-22, FR-28, FR-30, FR-32 | Publishing a gig notifies matching Talent within seconds; Java vs Go fan-out benchmark |
 | 3 | Browse and search | Full FR-9, FR-10, FR-11, FR-12, FR-33, FR-34, FR-35 | Anyone can find Talent and gigs by zone, category and date |
-| 4 | AI gig creation | FR-13, FR-14, FR-17, then F-6 | One sentence becomes reviewed, published gigs |
+| 4 | Category proposals; web frontend (stretch) | F-6. Separately, a React/Next.js web app calling the API, if time allows | A Talent proposes a new category and the AI evaluates it; the main flows usable in a browser |
 
 ## Monetisation readiness (parked)
 
@@ -312,6 +328,8 @@ Monetisation is off at launch, and gig payments stay offline with no commission.
 - **F-4** Promoted (paid) Talent, shown as clearly labelled recommendations alongside AI drafts.
 - **F-5** An AI-assisted portfolio builder inside the app.
 - **F-6 (Phase 2) Category proposals.** A Talent who can't find their category can propose one. The proposal is held as not-live: the Talent isn't matched or found under it yet. An AI evaluation checks it for duplicates and synonyms of existing categories, fit with the focus (artistic and talent-based work) and policy problems, and records pros and cons. A clear, non-duplicate proposal is created automatically, even if only one Talent proposed it, and becomes available to AI drafting straight away. Anything with a conflict or low confidence goes to an Admin for approval.
+- **F-7 Saved drafts.** Posters can leave gig drafts and finish them later, either kept for 24–48 hours in a cache or stored for 14 days in a separate draft table. Not in the initial phases; to be decided once a frontend shows whether people need it.
+- **F-8 Preferred work zones for notifications.** A Talent is also notified for gigs in zones they choose, even outside their radius (for example, someone in one suburb who regularly works in another part of the city).
 
 ## Open questions
 
