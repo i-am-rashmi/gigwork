@@ -1,0 +1,9 @@
+# Local development only: ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+# The keys below are fake on purpose. DevConfigurationGuard refuses to start with them (or with the dev OTP
+# sender) under any profile other than local/test, so they can never be used in a real environment.
+gigwork:
+  identity:
+    mobile-hash-key: dev-only-not-a-secret-local-mobile-hash-key
+    otp-hash-key: dev-only-not-a-secret-local-otp-hash-key
+    otp:
+      sender: dev   # logs the OTP code on logger gigwork.dev.otp

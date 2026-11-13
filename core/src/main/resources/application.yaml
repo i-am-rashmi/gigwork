@@ -21,6 +21,20 @@ spring:
     virtual:
       enabled: true   # Java 21 virtual threads for request handling
 
+gigwork:
+  identity:
+    # Secrets have no value here on purpose (NFR-45). Outside the local and test profiles set, from the
+    # environment: GIGWORK_IDENTITY_MOBILE_HASH_KEY, GIGWORK_IDENTITY_OTP_HASH_KEY (each at least 32 characters)
+    # and the JWT key pair GIGWORK_IDENTITY_JWT_PRIVATE_KEY / GIGWORK_IDENTITY_JWT_PUBLIC_KEY (PEM).
+    otp:
+      sender: none   # none | dev. 'dev' logs codes and is refused outside the local and test profiles
+    jwt:
+      issuer: gigwork-core
+      access-token-ttl: 15m
+    session:
+      idle-timeout: 7d
+      absolute-timeout: 30d
+
 management:
   endpoints:
     web:
