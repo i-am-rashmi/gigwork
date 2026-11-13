@@ -33,6 +33,7 @@ Each top-level package under `com.gigwork.core` is a Spring Modulith module:
 
 - Java records for DTOs, events and value objects. No Lombok.
 - Constructor injection only; no field injection.
+- Never throw generic exceptions (`Exception`, `RuntimeException`, `Throwable`). Throw specific, named exceptions instead, e.g. `GigNotOpenException` or `TalentAlreadyBookedException`. ArchUnit's `NO_GENERIC_EXCEPTIONS` rule enforces this and fails the build.
 - Validate input on the server with Bean Validation (`@NotNull`, `@Size`, ...). Never trust the client.
 - Never log mobile numbers, emails, OTP codes or tokens (NFR-46).
 - Times are `Instant`/`OffsetDateTime` in UTC; stored as `TIMESTAMPTZ`.
