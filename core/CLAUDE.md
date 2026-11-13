@@ -7,9 +7,22 @@ Spring Boot modular monolith. Root package: `com.gigwork.core`.
 Each top-level package under `com.gigwork.core` is a Spring Modulith module:
 `identity`, `profile`, `availability`, `reference`, `gigs`, `aidrafting`, `hiring`, `discovery`, `platform`, `moderation`.
 
-- A module's **base package is its public API**: services, DTOs (Java records) and events other modules may use.
-- **Sub-packages are internal** (e.g. `domain`, `persistence`, `web`). Other modules must never use them.
+- A module's **base package is its public API**: the types, DTOs (Java records) and events other modules may use, and nothing else.
+- **Sub-packages are internal** (see Module layout). Other modules must never use them.
 - Each module owns the database schema of the same name (ADR-0003). `aidrafting` uses the `ai_drafting` schema.
+
+## Module layout
+
+Inside each module (all sub-packages are internal):
+
+- `web`: controllers and exception handlers
+- `web/dto`: request and response records of the HTTP API
+- `application`: use cases (services, transactions)
+- `domain`: types, rules and exceptions
+- `persistence`: JPA entities and repositories
+- `config`: configuration classes and properties
+
+The base package holds only the module's public API. Result records that never leave the module stay next to the code that returns them.
 
 ## Rules across modules
 
@@ -26,6 +39,8 @@ Each top-level package under `com.gigwork.core` is a Spring Modulith module:
 - **Never edit a migration that is already on `main`.** Add a new one.
 - Migrations must be backward compatible (NFR-70): add first, switch code, remove later. No renames or drops of columns still used by the running version.
 - Always schema-qualify tables: `availability.booking`, not `booking`.
+- **JPA by default (ADR-0008).** Entities and Spring Data repositories for ordinary reads and writes. Any write that enforces an invariant (conditional status change, counter with a limit, token rotation, `ON CONFLICT` insert) is **one native SQL statement** with a concurrency test, never load-modify-save.
+- **No network calls (HTTP, SMS, email, Kafka) inside a database transaction.**
 - Invariants belong in the database where possible (ADR-0002): unique constraints, partial unique indexes, the exclusion constraint for overlapping bookings, conditional updates such as `UPDATE ... WHERE status = 'OPEN'`. Don't replace these with check-then-act code.
 - IDs are random UUIDs, never sequences (NFR-33). City-local rows carry `city_id`.
 
@@ -40,7 +55,7 @@ Each top-level package under `com.gigwork.core` is a Spring Modulith module:
 
 ## Authentication and configuration (identity)
 
-- Every endpoint needs a bearer access token except `POST /v1/auth/otp/request`, `/v1/auth/otp/verify`, `/v1/auth/token/refresh` and `/actuator/health/**`. Don't add public paths without a decision.
+- Every endpoint needs a bearer access token except the ones declared public (currently `POST /v1/auth/otp/request`, `/v1/auth/otp/verify`, `/v1/auth/token/refresh`, the health probes and the API docs). **Public endpoints are declared in the owning module with a `PublicEndpoints` bean (ADR-0009), never by editing the security configuration** (which lives in the platform module). Public means "no token required": an invalid or expired token is still a 401. `PublicEndpointsTest` lists every public endpoint, so adding one means changing that test on purpose.
 - All endpoints live under `/v1`. Controllers declare paths **without** it: the platform module adds the prefix (`ApiPaths.V1`) in one place.
 - Look accounts up only by the keyed hash of the normalised mobile number (`KeyedHasher`, `MobileNumber`), never by the number itself. Never log mobile numbers, OTP codes or tokens; give request/response records a masking `toString`.
 - Secrets have no defaults. Locally use the `local` profile (fake keys prefixed `dev-only-not-a-secret-`, dev OTP sender, generated JWT keys, Swagger UI). `DevConfigurationGuard` refuses to start with any of these unless every active profile is `local` or `test`.
