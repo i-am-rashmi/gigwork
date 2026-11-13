@@ -43,7 +43,7 @@ The OTP rules are already specified: codes hashed and expiring after 5 minutes, 
 - **Deny list:** account IDs that are deleted or suspended are kept in Redis until their last access token would have expired, and checked on every request, so access ends immediately.
 - **Step-up:** changing a mobile number or email, and deleting an account, require a fresh OTP regardless of session age.
 - **OTP:** built in the Identity module, following NFR-28 and NFR-37. Codes and refresh tokens are stored hashed; mobile numbers and emails are encrypted (NFR-44).
-- **Sending:** behind an OtpSender interface. Phase 1 uses a development sender that writes codes to the logs or a test inbox, for local work, demos and load tests; it is controlled by a feature flag that is off by default and never enabled in production. A real SMS provider is chosen and DLT registration completed before real users.
+- **Sending:** behind an OtpSender interface. Phase 1 uses a development sender that writes codes to the logs or a test inbox, for local work, demos and load tests; it is selected by the configuration property gigwork.identity.otp.sender (none by default). The development sender is refused at startup outside the local and test profiles.
 
 ## Consequences
 

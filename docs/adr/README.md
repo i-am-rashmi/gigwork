@@ -11,5 +11,6 @@ Each ADR records one significant decision: the context, the options considered, 
 | [0005](0005-authentication.md) | OTP login built in Identity, JWT access tokens with rotating refresh tokens | Accepted |
 | [0006](0006-feature-flags.md) | Feature flags through OpenFeature, backed by our own PostgreSQL provider | Accepted |
 | [0007](0007-inbox-api-and-routing.md) | The worker serves the inbox API behind a single path-based router | Accepted |
-
+| [0008](0008-persistence-convention.md) | JPA by default; single native SQL statements for writes that enforce invariants | Accepted |
+| [0009](0009-endpoint-security.md) | Security configured in the Platform module; each module declares its own public endpoints | Accepted |
 Related design documents: [PRD](../prd.md) · [Components and flows](../design/components-and-flows.md) · [Data model](../design/data-model.md)
