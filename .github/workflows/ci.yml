@@ -1,0 +1,56 @@
+# CI for the GigWork core service.
+# Runs the same check you run locally (./mvnw verify) on every push to main
+# and on every pull request into main.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same branch/PR cancels the older, now-pointless run
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# The workflow only needs to read the code
+permissions:
+  contents: read
+
+jobs:
+  core-verify:
+    name: core / mvnw verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: core   # the Maven project lives in core/
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21 (Temurin, same as .sdkmanrc)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven              # reuse ~/.m2 between runs
+          cache-dependency-path: core/pom.xml
+
+      - name: Build and test
+        # -B: batch mode (no interactive prompts, cleaner logs)
+        # --no-transfer-progress: hides the thousands of "Downloading..." lines
+        # Testcontainers starts its own PostGIS container using the runner's Docker
+        run: ./mvnw -B --no-transfer-progress verify
+
+      - name: Upload test reports if tests fail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: core/target/surefire-reports/
+          retention-days: 7
