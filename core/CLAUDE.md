@@ -22,6 +22,8 @@ Inside each module (all sub-packages are internal):
 - `persistence`: JPA entities and repositories
 - `config`: configuration classes and properties
 
+A module may have additional sub-packages for a distinct technical concern that would crowd a layer (for example identity's `security` and `otp` packages). Name them after the concern, not a pattern.
+
 The base package holds only the module's public API. Result records that never leave the module stay next to the code that returns them.
 
 ## Rules across modules
