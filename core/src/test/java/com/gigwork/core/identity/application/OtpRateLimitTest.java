@@ -177,6 +177,22 @@ class OtpRateLimitTest {
 		assertThat(tryRequest(mobile)).isPresent();
 	}
 
+	/**
+	 * PostgreSQL stores microseconds and rounds; a clock with nanoseconds made "newest + 30 s - now" slightly
+	 * positive at exactly 30 s (seen on Linux, whose clock has nanosecond precision). The clock gives whole
+	 * microseconds, so exactly 30 seconds later is always allowed.
+	 */
+	@Test
+	void exactlyThirtySecondsLaterIsAllowedEvenWhenTheClockHasNanoseconds() {
+		MobileNumber mobile = TestNumbers.next();
+		clock.set(Instant.parse("2026-01-01T10:00:00.123456789Z"));
+		otp.request(mobile);
+
+		clock.advance(Duration.ofSeconds(30));
+
+		assertThat(tryRequest(mobile)).isPresent();
+	}
+
 	@Test
 	void theFourthCodeWithinFifteenMinutesWaitsUntilTheFirstLeavesTheWindow() {
 		MobileNumber mobile = TestNumbers.next();
