@@ -6,11 +6,6 @@ import java.util.UUID;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
@@ -21,45 +16,18 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
 import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-import org.springframework.security.web.SecurityFilterChain;
 
 import com.gigwork.core.identity.config.IdentityProperties;
-import com.gigwork.core.platform.ApiPaths;
-
-import jakarta.servlet.DispatcherType;
 
 /**
- * Every endpoint needs a valid access token except the three auth endpoints, the health probes and the API docs
- * (the docs exist only where springdoc is switched on, i.e. the local profile). Stateless: no session, no cookie,
- * no CSRF token, because the API is called with a bearer token and never with browser credentials.
+ * Identity issues the access tokens, so identity also knows how to verify them. The platform module's security
+ * configuration uses this {@link JwtDecoder} bean without depending on identity (ADR-0009).
  */
 @Configuration(proxyBeanMethods = false)
-class SecurityConfig {
+class JwtDecoderConfig {
 
 	/** Tolerated difference between the clocks of the instances that issue and check tokens. */
 	private static final Duration CLOCK_SKEW = Duration.ofSeconds(30);
-
-	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder) throws Exception {
-		http
-				.csrf(AbstractHttpConfigurer::disable)
-				.formLogin(AbstractHttpConfigurer::disable)
-				.httpBasic(AbstractHttpConfigurer::disable)
-				.logout(AbstractHttpConfigurer::disable)
-				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-				.authorizeHttpRequests(requests -> requests
-						// error pages carry no data and must not turn a 415 or 404 into a 401
-						.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-						.requestMatchers(HttpMethod.POST, ApiPaths.V1 + "/auth/otp/request",
-								ApiPaths.V1 + "/auth/otp/verify", ApiPaths.V1 + "/auth/token/refresh")
-						.permitAll()
-						.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-						.requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**")
-						.permitAll()
-						.anyRequest().authenticated())
-				.oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)));
-		return http.build();
-	}
 
 	/**
 	 * Verifies access tokens locally with the public key (ADR-0005): signature (RS256 only, which rules out

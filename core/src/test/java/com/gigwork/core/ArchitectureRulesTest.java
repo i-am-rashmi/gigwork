@@ -22,6 +22,9 @@ class ArchitectureRulesTest {
 	static final ArchRule noSystemOut = ArchitectureRules.NO_STANDARD_STREAMS;
 
 	@ArchTest
+	static final ArchRule onlyPlatformDeclaresInfrastructureEndpoints = ArchitectureRules.ONLY_PLATFORM_DECLARES_INFRASTRUCTURE_ENDPOINTS;
+
+	@ArchTest
 	static final ArchRule noGenericExceptions = ArchitectureRules.NO_GENERIC_EXCEPTIONS;
 
 }

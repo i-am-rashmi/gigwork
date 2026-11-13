@@ -1,11 +1,11 @@
-package com.gigwork.core.identity.web;
+package com.gigwork.core.identity.web.dto;
 
 import com.gigwork.core.identity.application.AuthTokens;
 
 /** A new token pair; the refresh token that was sent no longer works. */
 public record RefreshResponse(String accessToken, String tokenType, long expiresIn, String refreshToken) {
 
-	static RefreshResponse of(AuthTokens tokens) {
+	public static RefreshResponse of(AuthTokens tokens) {
 		return new RefreshResponse(tokens.accessToken(), "Bearer", tokens.expiresInSeconds(), tokens.refreshToken());
 	}
 

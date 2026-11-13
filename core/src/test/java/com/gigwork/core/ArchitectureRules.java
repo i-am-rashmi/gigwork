@@ -9,6 +9,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.stereotype.Repository;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.gigwork.core.platform.PublicEndpoints;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.library.GeneralCodingRules;
 
@@ -45,6 +46,13 @@ final class ArchitectureRules {
 			.allowEmptyShould(true);
 
 	static final ArchRule NO_STANDARD_STREAMS = GeneralCodingRules.NO_CLASSES_SHOULD_ACCESS_STANDARD_STREAMS
+			.allowEmptyShould(true);
+
+	static final ArchRule ONLY_PLATFORM_DECLARES_INFRASTRUCTURE_ENDPOINTS = noClasses()
+			.that().resideOutsideOfPackage("com.gigwork.core.platform..")
+			.should().callMethod(PublicEndpoints.class, "infrastructure", String[].class)
+			.because("modules declare public endpoints under /v1 with PublicEndpoints.get/post (ADR-0009); "
+					+ "unversioned infrastructure paths belong to the platform module")
 			.allowEmptyShould(true);
 
 	static final ArchRule NO_GENERIC_EXCEPTIONS = GeneralCodingRules.NO_CLASSES_SHOULD_THROW_GENERIC_EXCEPTIONS

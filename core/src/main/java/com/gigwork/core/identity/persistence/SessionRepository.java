@@ -17,18 +17,16 @@ public class SessionRepository {
 	public record SessionRef(UUID sessionId, UUID accountId) {
 	}
 
+	private final SessionJpaRepository sessions;
 	private final JdbcClient jdbc;
 
-	SessionRepository(JdbcClient jdbc) {
+	SessionRepository(SessionJpaRepository sessions, JdbcClient jdbc) {
+		this.sessions = sessions;
 		this.jdbc = jdbc;
 	}
 
 	public void insert(UUID sessionId, UUID accountId, byte[] refreshTokenHash, Instant now) {
-		jdbc.sql("""
-				INSERT INTO identity.session (id, account_id, refresh_token_hash, created_at, last_used_at)
-				VALUES (:id, :account, :hash, :now, :now)""")
-				.param("id", sessionId).param("account", accountId).param("hash", refreshTokenHash)
-				.param("now", utc(now)).update();
+		sessions.save(new Session(sessionId, accountId, refreshTokenHash, now));
 	}
 
 	/**
@@ -39,6 +37,7 @@ public class SessionRepository {
 	 */
 	public Optional<SessionRef> rotate(byte[] oldHash, byte[] newHash, Instant now, Duration idleTimeout,
 			Duration absoluteTimeout) {
+		sessions.flush(); // JdbcClient bypasses the persistence context: write pending inserts first
 		return jdbc.sql("""
 				UPDATE identity.session s SET refresh_token_hash = :newHash, last_used_at = :now
 				FROM identity.account a

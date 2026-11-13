@@ -1,4 +1,4 @@
-package com.gigwork.core.identity.web;
+package com.gigwork.core.identity.web.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
