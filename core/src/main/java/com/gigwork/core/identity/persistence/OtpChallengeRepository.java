@@ -1,8 +1,10 @@
 package com.gigwork.core.identity.persistence;
 
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,9 +38,38 @@ public class OtpChallengeRepository {
 		challenges.save(new OtpChallenge(id, targetHash, codeHash, createdAt, expiresAt));
 	}
 
-	/** Ends every live challenge of this number, so only the newest code works. */
-	public int supersedeLive(byte[] targetHash, Instant now) {
-		return challenges.supersedeLive(targetHash, now);
+	/**
+	 * Takes a transaction-scoped advisory lock derived from the number's hash, so requests for one number are
+	 * serialised from here until commit while other numbers are unaffected. Must run inside a transaction. Two
+	 * numbers whose hashes share the first 8 bytes would only wait for each other needlessly.
+	 */
+	public void lockNumber(byte[] targetHash) {
+		long key = ByteBuffer.wrap(targetHash, 0, Long.BYTES).getLong();
+		jdbc.sql("SELECT pg_advisory_xact_lock(:key)").param("key", key).query().singleValue();
+	}
+
+	/**
+	 * Creation times of the newest (up to {@code limit}) challenges of this number created after {@code since},
+	 * newest first. Failed deliveries count: they are rows like any other.
+	 */
+	public List<Instant> recentCreatedAt(byte[] targetHash, Instant since, int limit) {
+		challenges.flush();
+		return jdbc.sql("""
+				SELECT created_at FROM identity.otp_challenge
+				WHERE target_hash = :target AND created_at > :since
+				ORDER BY created_at DESC LIMIT :limit""")
+				.param("target", targetHash).param("since", utc(since)).param("limit", limit)
+				.query(OffsetDateTime.class).list().stream().map(OffsetDateTime::toInstant).toList();
+	}
+
+	/** Ends the live challenges of this number that are older than the new one, so only the newest code works. */
+	public int supersedeOlder(byte[] targetHash, Instant newCreatedAt, Instant now) {
+		return challenges.supersedeOlder(targetHash, newCreatedAt, now);
+	}
+
+	/** The code could not be delivered: the challenge can never be verified, but still counts toward the limit. */
+	public void markDeliveryFailed(UUID id, Instant now) {
+		challenges.markDeliveryFailed(id, now);
 	}
 
 	/**
@@ -50,7 +81,7 @@ public class OtpChallengeRepository {
 		return jdbc.sql("""
 				UPDATE identity.otp_challenge SET attempts = attempts + 1
 				WHERE id = :id AND target_hash = :target AND purpose = 'LOGIN'
-				  AND used_at IS NULL AND expires_at > :now AND attempts < :max
+				  AND used_at IS NULL AND delivery_failed_at IS NULL AND expires_at > :now AND attempts < :max
 				RETURNING code_hash""")
 				.param("id", id).param("target", targetHash).param("now", utc(now)).param("max", MAX_ATTEMPTS)
 				.query(byte[].class).optional();

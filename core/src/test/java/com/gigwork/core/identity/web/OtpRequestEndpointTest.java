@@ -126,6 +126,7 @@ class OtpRequestEndpointTest {
 		MobileNumber mobile = TestNumbers.next();
 
 		UUID first = UUID.fromString(JsonPath.read(request(mobile.value()).getResponse().getContentAsString(), "$.challengeId"));
+		clock.advance(Duration.ofSeconds(30)); // a new code is allowed 30 seconds after the previous one
 		UUID second = UUID.fromString(JsonPath.read(request(mobile.value()).getResponse().getContentAsString(), "$.challengeId"));
 
 		assertThat(first).isNotEqualTo(second);

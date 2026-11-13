@@ -26,6 +26,7 @@ import com.gigwork.core.identity.web.dto.RefreshResponse;
 import com.gigwork.core.identity.web.dto.VerifyOtpRequest;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -49,7 +50,10 @@ class AuthController {
 
 	/** Sends a one-time code to the number. The same call serves new and returning users. */
 	@Operation(summary = "Send a one-time code",
-			description = "Indian mobile numbers only. The code is valid for 5 minutes and allows 5 attempts.")
+			description = "Indian mobile numbers only. The code is valid for 5 minutes and allows 5 attempts. "
+					+ "At most 3 codes per 15 minutes per number, and a new code only 30 seconds after the previous one.")
+	@ApiResponse(responseCode = "429", description = "Too many code requests; see the Retry-After header (seconds)")
+	@ApiResponse(responseCode = "503", description = "The code could not be sent; the previous code stays valid")
 	@PostMapping("/otp/request")
 	@ResponseStatus(HttpStatus.ACCEPTED)
 	OtpRequestResponse requestOtp(@Valid @RequestBody OtpRequest request) {

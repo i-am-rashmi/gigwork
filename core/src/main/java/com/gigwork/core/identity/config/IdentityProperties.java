@@ -3,6 +3,7 @@ package com.gigwork.core.identity.config;
 import java.time.Duration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
@@ -30,8 +31,23 @@ public record IdentityProperties(
 
 	static final int MIN_KEY_LENGTH = 32;
 
-	/** Which {@code OtpSender} exists in the application. {@code none} is the default and delivers nothing. */
-	public record Otp(@NotNull @DefaultValue("none") SenderType sender) {
+	/**
+	 * @param sender      which {@code OtpSender} exists in the application; {@code none} is the default and
+	 *                    delivers nothing
+	 * @param sendTimeout how long to wait for the sender before the delivery counts as failed
+	 */
+	public record Otp(@NotNull @DefaultValue("none") SenderType sender,
+			@NotNull @DefaultValue("5s") Duration sendTimeout) {
+
+		static final Duration DEFAULT_SEND_TIMEOUT = Duration.ofSeconds(5);
+
+		@ConstructorBinding
+		public Otp {
+		}
+
+		public Otp(SenderType sender) {
+			this(sender, DEFAULT_SEND_TIMEOUT);
+		}
 
 		public enum SenderType {
 			/** No delivery: requesting a code fails with 503. The default everywhere except the local profile. */
