@@ -36,7 +36,7 @@ Rolling deploys (NFR-32) already require at least two core instances behind a lo
 
 ## Decision
 
-- **A single path-based router is the only public entry point:** /me/notifications/\*\* goes to the worker's inbox API; everything else goes to the core instances. In the cloud this is an Application Load Balancer; locally, a small Nginx or Traefik container.
+- **A single path-based router is the only public entry point:** /v1/me/notifications/\*\* goes to the worker's inbox API; everything else goes to the core instances. In the cloud this is an Application Load Balancer; locally, a small Nginx or Traefik container.
 - **The router only routes.** HTTPS terminates there, but authentication and rate limits stay in each service (ADR-0005, NFR-40), so every service remains secure on its own.
 - **The worker serves the inbox API itself**, as a separate process from the fan-out consumer, built from the same codebase:
   - fanout-consumer: consumes events and writes inbox items (Java, and Go for the benchmark).
