@@ -24,24 +24,21 @@ public class OtpChallengeRepository {
 	/** NFR-37. Also enforced by the otp_challenge_attempts_range constraint. */
 	public static final int MAX_ATTEMPTS = 5;
 
+	private final OtpChallengeJpaRepository challenges;
 	private final JdbcClient jdbc;
 
-	OtpChallengeRepository(JdbcClient jdbc) {
+	OtpChallengeRepository(OtpChallengeJpaRepository challenges, JdbcClient jdbc) {
+		this.challenges = challenges;
 		this.jdbc = jdbc;
 	}
 
 	public void insert(UUID id, byte[] targetHash, byte[] codeHash, Instant createdAt, Instant expiresAt) {
-		jdbc.sql("""
-				INSERT INTO identity.otp_challenge (id, target_hash, code_hash, purpose, created_at, expires_at)
-				VALUES (:id, :target, :code, 'LOGIN', :createdAt, :expiresAt)""")
-				.param("id", id).param("target", targetHash).param("code", codeHash)
-				.param("createdAt", utc(createdAt)).param("expiresAt", utc(expiresAt)).update();
+		challenges.save(new OtpChallenge(id, targetHash, codeHash, createdAt, expiresAt));
 	}
 
 	/** Ends every live challenge of this number, so only the newest code works. */
 	public int supersedeLive(byte[] targetHash, Instant now) {
-		return jdbc.sql("UPDATE identity.otp_challenge SET used_at = :now WHERE target_hash = :target AND used_at IS NULL")
-				.param("now", utc(now)).param("target", targetHash).update();
+		return challenges.supersedeLive(targetHash, now);
 	}
 
 	/**
@@ -49,6 +46,7 @@ public class OtpChallengeRepository {
 	 * unused and unexpired, and has attempts left. Empty means "do not even compare".
 	 */
 	public Optional<byte[]> recordAttempt(UUID id, byte[] targetHash, Instant now) {
+		challenges.flush(); // JdbcClient bypasses the persistence context: write pending inserts first
 		return jdbc.sql("""
 				UPDATE identity.otp_challenge SET attempts = attempts + 1
 				WHERE id = :id AND target_hash = :target AND purpose = 'LOGIN'
@@ -65,8 +63,7 @@ public class OtpChallengeRepository {
 	 * OtpConcurrencyTest fails if both are removed.
 	 */
 	public boolean markUsed(UUID id, Instant now) {
-		return jdbc.sql("UPDATE identity.otp_challenge SET used_at = :now WHERE id = :id AND used_at IS NULL")
-				.param("now", utc(now)).param("id", id).update() == 1;
+		return challenges.markUsed(id, now) == 1;
 	}
 
 	private static OffsetDateTime utc(Instant instant) {
