@@ -18,6 +18,8 @@ import com.tngtech.archunit.library.GeneralCodingRules;
  *
  * <p>Not yet checkable (follow-ups): only the platform module writes outbox events; schema-mapped entities are
  * used only from their module; no JPA relationships across modules; layering inside modules; native SQL scan.
+ * Also: remove {@code allowEmptyShould(true)} from each rule once the modules it covers contain real classes,
+ * so a rule that matches nothing is reported instead of silently passing.
  */
 final class ArchitectureRules {
 
