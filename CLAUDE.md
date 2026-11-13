@@ -38,7 +38,8 @@ Java 21 (pinned in `.sdkmanrc`), Spring Boot, Maven (`./mvnw`), Spring Data JPA,
 
 ```bash
 docker compose -f infra/docker-compose.yml up -d     # local Postgres, Redis, Kafka
-cd core && ./mvnw spring-boot:run                     # run the core
+cd core && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # run the core locally
+                                                      # (fake keys, OTP codes logged on gigwork.dev.otp, Swagger UI at /swagger-ui.html)
 cd core && ./mvnw verify                              # build + all tests (what CI runs)
 cd core && ./mvnw test -Dtest=ClassName               # one test class
 ```

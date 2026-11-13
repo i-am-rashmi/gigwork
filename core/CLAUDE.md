@@ -38,6 +38,14 @@ Each top-level package under `com.gigwork.core` is a Spring Modulith module:
 - Never log mobile numbers, emails, OTP codes or tokens (NFR-46).
 - Times are `Instant`/`OffsetDateTime` in UTC; stored as `TIMESTAMPTZ`.
 
+## Authentication and configuration (identity)
+
+- Every endpoint needs a bearer access token except `POST /v1/auth/otp/request`, `/v1/auth/otp/verify`, `/v1/auth/token/refresh` and `/actuator/health/**`. Don't add public paths without a decision.
+- All endpoints live under `/v1`. Controllers declare paths **without** it: the platform module adds the prefix (`ApiPaths.V1`) in one place.
+- Look accounts up only by the keyed hash of the normalised mobile number (`KeyedHasher`, `MobileNumber`), never by the number itself. Never log mobile numbers, OTP codes or tokens; give request/response records a masking `toString`.
+- Secrets have no defaults. Locally use the `local` profile (fake keys prefixed `dev-only-not-a-secret-`, dev OTP sender, generated JWT keys, Swagger UI). `DevConfigurationGuard` refuses to start with any of these unless every active profile is `local` or `test`.
+- Which `OtpSender` exists is chosen by `gigwork.identity.otp.sender` (`none` by default, `dev` locally): deployment configuration, not a runtime flag.
+
 ## Tests
 
 - **Unit tests** for domain logic.
