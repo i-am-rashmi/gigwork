@@ -32,7 +32,7 @@ public class DevConfigurationGuard {
 	}
 
 	static void verify(IdentityProperties properties, String[] activeProfiles) {
-		if (isDevFriendly(activeProfiles)) {
+		if (onlyLocalOrTestProfilesActive(activeProfiles)) {
 			return;
 		}
 		List<String> problems = new ArrayList<>();
@@ -51,7 +51,11 @@ public class DevConfigurationGuard {
 		}
 	}
 
-	private static boolean isDevFriendly(String[] activeProfiles) {
+	/**
+	 * True only if at least one profile is active and every active profile is {@code local} or {@code test}.
+	 * Anything that is allowed only for development (fake keys, the dev sender, generated signing keys) uses this.
+	 */
+	public static boolean onlyLocalOrTestProfilesActive(String[] activeProfiles) {
 		return activeProfiles.length > 0 && Set.of(activeProfiles).stream().allMatch(DEV_FRIENDLY_PROFILES::contains);
 	}
 

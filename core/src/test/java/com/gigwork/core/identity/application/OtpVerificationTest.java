@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
-import com.gigwork.core.identity.application.AccountService.VerifiedAccount;
+import com.gigwork.core.identity.application.AuthenticationService.LoginResult;
 import com.gigwork.core.identity.application.OtpService.IssuedChallenge;
 import com.gigwork.core.identity.domain.MobileNumber;
 import com.gigwork.core.identity.security.KeyedHasher;
@@ -72,7 +72,7 @@ class OtpVerificationTest {
 		MobileNumber mobile = TestNumbers.next();
 		IssuedChallenge challenge = issue(mobile);
 
-		VerifiedAccount account = authentication.verifyOtp(mobile, challenge.challengeId(), sender.lastCode(mobile))
+		LoginResult account = authentication.verifyOtp(mobile, challenge.challengeId(), sender.lastCode(mobile))
 				.orElseThrow();
 
 		assertThat(account.newAccount()).isTrue();
@@ -94,11 +94,11 @@ class OtpVerificationTest {
 	void aReturningNumberLogsInToTheSameAccount() {
 		MobileNumber mobile = TestNumbers.next();
 		IssuedChallenge first = issue(mobile);
-		VerifiedAccount signedUp = authentication.verifyOtp(mobile, first.challengeId(), sender.lastCode(mobile))
+		LoginResult signedUp = authentication.verifyOtp(mobile, first.challengeId(), sender.lastCode(mobile))
 				.orElseThrow();
 
 		IssuedChallenge second = issue(mobile);
-		VerifiedAccount loggedIn = authentication.verifyOtp(mobile, second.challengeId(), sender.lastCode(mobile))
+		LoginResult loggedIn = authentication.verifyOtp(mobile, second.challengeId(), sender.lastCode(mobile))
 				.orElseThrow();
 
 		assertThat(loggedIn.accountId()).isEqualTo(signedUp.accountId());

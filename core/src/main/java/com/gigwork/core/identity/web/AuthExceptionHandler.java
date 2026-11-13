@@ -8,6 +8,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 import com.gigwork.core.identity.domain.InvalidMobileNumberException;
 import com.gigwork.core.identity.domain.InvalidOtpException;
+import com.gigwork.core.identity.domain.InvalidRefreshTokenException;
 import com.gigwork.core.identity.domain.OtpDeliveryUnavailableException;
 
 /**
@@ -25,6 +26,11 @@ class AuthExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(InvalidOtpException.class)
 	ProblemDetail invalidOtp() {
 		return problem(HttpStatus.UNAUTHORIZED, "Invalid code", "The code is invalid or has expired.");
+	}
+
+	@ExceptionHandler(InvalidRefreshTokenException.class)
+	ProblemDetail invalidRefreshToken() {
+		return problem(HttpStatus.UNAUTHORIZED, "Invalid refresh token", "The refresh token is invalid or has expired.");
 	}
 
 	@ExceptionHandler(OtpDeliveryUnavailableException.class)

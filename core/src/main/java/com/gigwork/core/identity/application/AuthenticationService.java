@@ -13,12 +13,18 @@ import com.gigwork.core.identity.domain.MobileNumber;
 @Service
 public class AuthenticationService {
 
+	/** @param newAccount true if this login created the account (sign-up) */
+	public record LoginResult(UUID accountId, boolean newAccount, AuthTokens tokens) {
+	}
+
 	private final OtpService otp;
 	private final AccountService accounts;
+	private final SessionService sessions;
 
-	AuthenticationService(OtpService otp, AccountService accounts) {
+	AuthenticationService(OtpService otp, AccountService accounts, SessionService sessions) {
 		this.otp = otp;
 		this.accounts = accounts;
+		this.sessions = sessions;
 	}
 
 	/**
@@ -26,11 +32,12 @@ public class AuthenticationService {
 	 * failed attempt stays counted; callers turn an empty result into a 401 after this method has returned.
 	 */
 	@Transactional
-	public Optional<VerifiedAccount> verifyOtp(MobileNumber mobile, UUID challengeId, String code) {
+	public Optional<LoginResult> verifyOtp(MobileNumber mobile, UUID challengeId, String code) {
 		if (!otp.verify(mobile, challengeId, code)) {
 			return Optional.empty();
 		}
-		return accounts.findOrCreate(mobile);
+		Optional<VerifiedAccount> account = accounts.findOrCreate(mobile);
+		return account.map(a -> new LoginResult(a.accountId(), a.newAccount(), sessions.start(a.accountId())));
 	}
 
 }

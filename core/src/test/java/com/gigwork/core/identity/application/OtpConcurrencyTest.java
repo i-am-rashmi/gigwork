@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
-import com.gigwork.core.identity.application.AccountService.VerifiedAccount;
+import com.gigwork.core.identity.application.AuthenticationService.LoginResult;
 import com.gigwork.core.identity.application.OtpService.IssuedChallenge;
 import com.gigwork.core.identity.domain.MobileNumber;
 import com.gigwork.core.identity.persistence.OtpChallengeRepository;
@@ -59,7 +59,7 @@ class OtpConcurrencyTest {
 		String code = sender.lastCode(mobile);
 		String wrong = code.equals("000000") ? "000001" : "000000";
 
-		List<Optional<VerifiedAccount>> results = Concurrently.runAll(THREADS,
+		List<Optional<LoginResult>> results = Concurrently.runAll(THREADS,
 				() -> authentication.verifyOtp(mobile, challenge.challengeId(), wrong));
 
 		assertThat(results).allMatch(Optional::isEmpty);
@@ -74,7 +74,7 @@ class OtpConcurrencyTest {
 		IssuedChallenge challenge = otp.request(mobile);
 		String code = sender.lastCode(mobile);
 
-		List<Optional<VerifiedAccount>> results = Concurrently.runAll(THREADS,
+		List<Optional<LoginResult>> results = Concurrently.runAll(THREADS,
 				() -> authentication.verifyOtp(mobile, challenge.challengeId(), code));
 
 		assertThat(results.stream().filter(Optional::isPresent)).hasSize(1);
@@ -90,7 +90,7 @@ class OtpConcurrencyTest {
 		MobileNumber mobile = TestNumbers.next();
 		byte[] target = hasher.hashMobile(mobile);
 		Instant now = Instant.now();
-		List<Callable<Optional<VerifiedAccount>>> logins = new ArrayList<>();
+		List<Callable<Optional<LoginResult>>> logins = new ArrayList<>();
 		for (int i = 0; i < 8; i++) {
 			UUID id = UUID.randomUUID();
 			String code = String.format("%06d", i);
@@ -98,7 +98,7 @@ class OtpConcurrencyTest {
 			logins.add(() -> authentication.verifyOtp(mobile, id, code));
 		}
 
-		List<Optional<VerifiedAccount>> results = Concurrently.runAll(logins);
+		List<Optional<LoginResult>> results = Concurrently.runAll(logins);
 
 		assertThat(results).allMatch(Optional::isPresent);
 		assertThat(results.stream().map(r -> r.get().accountId()).distinct()).hasSize(1);
