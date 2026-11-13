@@ -1,0 +1,5 @@
+# Used by all tests (the surefire configuration activates the 'test' profile). Fake keys, see DevConfigurationGuard.
+gigwork:
+  identity:
+    mobile-hash-key: dev-only-not-a-secret-test-mobile-hash-key
+    otp-hash-key: dev-only-not-a-secret-test-otp-hash-key
