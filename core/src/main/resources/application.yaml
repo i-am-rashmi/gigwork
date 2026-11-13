@@ -35,6 +35,13 @@ gigwork:
       idle-timeout: 7d
       absolute-timeout: 30d
 
+springdoc:
+  # API docs and Swagger UI are off by default; the local profile switches them on
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 management:
   endpoints:
     web:

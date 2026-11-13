@@ -19,11 +19,16 @@ import com.gigwork.core.identity.domain.InvalidOtpException;
 import com.gigwork.core.identity.domain.InvalidRefreshTokenException;
 import com.gigwork.core.identity.domain.MobileNumber;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
 /** Sign up and log in (FR-1, FR-3). The /v1 prefix is added for all controllers by the platform module. */
 @RestController
 @RequestMapping("/auth")
+@Tag(name = "Authentication", description = "Sign up and log in with a mobile number and a one-time code")
+@SecurityRequirements // these endpoints are public: no bearer token needed
 class AuthController {
 
 	private final OtpService otp;
@@ -37,6 +42,8 @@ class AuthController {
 	}
 
 	/** Sends a one-time code to the number. The same call serves new and returning users. */
+	@Operation(summary = "Send a one-time code",
+			description = "Indian mobile numbers only. The code is valid for 5 minutes and allows 5 attempts.")
 	@PostMapping("/otp/request")
 	@ResponseStatus(HttpStatus.ACCEPTED)
 	OtpRequestResponse requestOtp(@Valid @RequestBody OtpRequest request) {
@@ -46,6 +53,8 @@ class AuthController {
 	}
 
 	/** Checks the code. A new number signs up, a known one logs in; both get tokens. */
+	@Operation(summary = "Verify the code and get tokens",
+			description = "A new number signs up, a known one logs in. 401 for any wrong, expired or used code.")
 	@PostMapping("/otp/verify")
 	ResponseEntity<LoginResponse> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
 		MobileNumber mobile = MobileNumber.parse(request.mobile());
@@ -56,6 +65,8 @@ class AuthController {
 	}
 
 	/** Exchanges a refresh token for a new access token and a new refresh token. */
+	@Operation(summary = "Refresh the tokens",
+			description = "The refresh token works once: the response carries its replacement.")
 	@PostMapping("/token/refresh")
 	ResponseEntity<RefreshResponse> refresh(@Valid @RequestBody RefreshRequest request) {
 		AuthTokens tokens = sessions.refresh(request.refreshToken()).orElseThrow(InvalidRefreshTokenException::new);

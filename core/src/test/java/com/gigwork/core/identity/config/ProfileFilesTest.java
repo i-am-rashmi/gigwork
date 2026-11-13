@@ -53,6 +53,18 @@ class ProfileFilesTest {
 	}
 
 	@Test
+	void apiDocsAndSwaggerUiAreOffByDefaultAndOnlyOnInTheLocalProfile() {
+		var defaults = load("application.yaml");
+		var local = load("application-local.yaml");
+
+		assertThat(defaults.getProperty("springdoc.api-docs.enabled")).isEqualTo("false");
+		assertThat(defaults.getProperty("springdoc.swagger-ui.enabled")).isEqualTo("false");
+		assertThat(local.getProperty("springdoc.api-docs.enabled")).isEqualTo("true");
+		assertThat(local.getProperty("springdoc.swagger-ui.enabled")).isEqualTo("true");
+		assertThat(load("application-test.yaml").getProperty("springdoc.api-docs.enabled")).isNull();
+	}
+
+	@Test
 	void devSenderIsEnabledInTheLocalProfileOnly() {
 		assertThat(load("application-local.yaml").getProperty("gigwork.identity.otp.sender")).isEqualTo("dev");
 		assertThat(load("application-test.yaml").getProperty("gigwork.identity.otp.sender")).isNull();

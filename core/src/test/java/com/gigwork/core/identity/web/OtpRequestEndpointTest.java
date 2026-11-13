@@ -20,9 +20,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import com.gigwork.core.identity.domain.MobileNumber;
+import com.gigwork.core.identity.security.AccessTokenIssuer;
 import com.gigwork.core.identity.security.KeyedHasher;
 import com.gigwork.core.identity.support.CapturingOtpSender;
 import com.gigwork.core.identity.support.IdentityIntegrationTest;
+import com.gigwork.core.identity.support.MutableClock;
 import com.gigwork.core.identity.support.TestNumbers;
 import com.jayway.jsonpath.JsonPath;
 
@@ -39,6 +41,10 @@ class OtpRequestEndpointTest {
 	KeyedHasher hasher;
 	@Autowired
 	CapturingOtpSender sender;
+	@Autowired
+	AccessTokenIssuer tokens;
+	@Autowired
+	MutableClock clock;
 
 	private static String body(String mobile) {
 		return "{\"mobile\":\"" + mobile + "\"}";
@@ -129,8 +135,14 @@ class OtpRequestEndpointTest {
 
 	@Test
 	void endpointIsOnlyReachableUnderTheVersionPrefix() throws Exception {
-		mvc.perform(post("/auth/otp/request").contentType(MediaType.APPLICATION_JSON).content(body("9876543210")))
+		String token = tokens.issue(UUID.randomUUID(), UUID.randomUUID(), clock.instant()).token();
+
+		// with a valid token the route simply does not exist; without one nothing about routes is revealed
+		mvc.perform(post("/auth/otp/request").header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON).content(body("9876543210")))
 				.andExpect(status().isNotFound());
+		mvc.perform(post("/auth/otp/request").contentType(MediaType.APPLICATION_JSON).content(body("9876543210")))
+				.andExpect(status().isUnauthorized());
 	}
 
 	private boolean isUsed(UUID id) {
