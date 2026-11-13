@@ -18,6 +18,12 @@ import com.gigwork.core.identity.application.SessionService;
 import com.gigwork.core.identity.domain.InvalidOtpException;
 import com.gigwork.core.identity.domain.InvalidRefreshTokenException;
 import com.gigwork.core.identity.domain.MobileNumber;
+import com.gigwork.core.identity.web.dto.LoginResponse;
+import com.gigwork.core.identity.web.dto.OtpRequest;
+import com.gigwork.core.identity.web.dto.OtpRequestResponse;
+import com.gigwork.core.identity.web.dto.RefreshRequest;
+import com.gigwork.core.identity.web.dto.RefreshResponse;
+import com.gigwork.core.identity.web.dto.VerifyOtpRequest;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;

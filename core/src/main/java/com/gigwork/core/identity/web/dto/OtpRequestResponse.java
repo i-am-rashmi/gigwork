@@ -1,4 +1,4 @@
-package com.gigwork.core.identity.web;
+package com.gigwork.core.identity.web.dto;
 
 import java.util.UUID;
 

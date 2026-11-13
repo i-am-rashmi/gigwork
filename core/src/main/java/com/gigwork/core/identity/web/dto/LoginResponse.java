@@ -1,4 +1,4 @@
-package com.gigwork.core.identity.web;
+package com.gigwork.core.identity.web.dto;
 
 import com.gigwork.core.identity.application.AuthTokens;
 
@@ -12,7 +12,7 @@ import com.gigwork.core.identity.application.AuthTokens;
 public record LoginResponse(String accessToken, String tokenType, long expiresIn, String refreshToken,
 		boolean newAccount) {
 
-	static LoginResponse of(AuthTokens tokens, boolean newAccount) {
+	public static LoginResponse of(AuthTokens tokens, boolean newAccount) {
 		return new LoginResponse(tokens.accessToken(), "Bearer", tokens.expiresInSeconds(), tokens.refreshToken(),
 				newAccount);
 	}
