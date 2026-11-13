@@ -28,6 +28,7 @@ gigwork:
     # and the JWT key pair GIGWORK_IDENTITY_JWT_PRIVATE_KEY / GIGWORK_IDENTITY_JWT_PUBLIC_KEY (PEM).
     otp:
       sender: none   # none | dev. 'dev' logs codes and is refused outside the local and test profiles
+      send-timeout: 5s   # after this the delivery counts as failed (503)
     jwt:
       issuer: gigwork-core
       access-token-ttl: 15m

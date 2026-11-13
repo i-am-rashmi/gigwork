@@ -231,6 +231,22 @@ class IdentitySchemaTest {
 	}
 
 	@Test
+	void otpChallengeCanBeMarkedAsFailedAndHasAnIndexForTheLimitCount() {
+		byte[] target = hash();
+		UUID id = UUID.randomUUID();
+		challenge(id, target, hash(), "LOGIN", 0);
+
+		int updated = jdbc.sql("UPDATE identity.otp_challenge SET delivery_failed_at = now() WHERE id = :id")
+				.param("id", id).update();
+
+		assertThat(updated).isEqualTo(1);
+		assertThat(jdbc.sql("""
+				SELECT indexdef FROM pg_indexes
+				WHERE schemaname = 'identity' AND indexname = 'otp_challenge_by_target_created'""")
+				.query(String.class).single()).contains("(target_hash, created_at)");
+	}
+
+	@Test
 	void sessionNeedsAnExistingAccount() {
 		Instant now = Instant.now();
 

@@ -37,6 +37,9 @@ class OtpChallenge extends AssignedIdEntity {
 	@Column(name = "used_at")
 	private Instant usedAt;
 
+	@Column(name = "delivery_failed_at")
+	private Instant deliveryFailedAt;
+
 	protected OtpChallenge() {
 	}
 

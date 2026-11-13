@@ -54,6 +54,7 @@ The base package holds only the module's public API. Result records that never l
 - Validate input on the server with Bean Validation (`@NotNull`, `@Size`, ...). Never trust the client.
 - Never log mobile numbers, emails, OTP codes or tokens (NFR-46).
 - Times are `Instant`/`OffsetDateTime` in UTC; stored as `TIMESTAMPTZ`.
+- Timestamps are truncated to microseconds (PostgreSQL's precision, which rounds anything finer) before they are stored or compared. Use the injected `Clock`, which does this, never `Instant.now()`. On Linux `Instant.now()` has nanoseconds, so a value compared with its stored copy can differ by up to half a microsecond.
 
 ## Authentication and configuration (identity)
 

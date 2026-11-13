@@ -97,6 +97,7 @@ class OtpVerificationTest {
 		LoginResult signedUp = authentication.verifyOtp(mobile, first.challengeId(), sender.lastCode(mobile))
 				.orElseThrow();
 
+		clock.advance(OtpService.RESEND_INTERVAL); // a new code is allowed 30 seconds after the previous one
 		IssuedChallenge second = issue(mobile);
 		LoginResult loggedIn = authentication.verifyOtp(mobile, second.challengeId(), sender.lastCode(mobile))
 				.orElseThrow();
@@ -205,6 +206,7 @@ class OtpVerificationTest {
 		MobileNumber mobile = TestNumbers.next();
 		IssuedChallenge first = issue(mobile);
 		String firstCode = sender.lastCode(mobile);
+		clock.advance(OtpService.RESEND_INTERVAL); // a new code is allowed 30 seconds after the previous one
 		issue(mobile);
 
 		assertThat(authentication.verifyOtp(mobile, first.challengeId(), firstCode)).isEmpty();

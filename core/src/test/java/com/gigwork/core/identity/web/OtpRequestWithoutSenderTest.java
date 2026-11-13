@@ -45,7 +45,7 @@ class OtpRequestWithoutSenderTest {
 	}
 
 	@Test
-	void answers503AndKeepsNoChallenge() throws Exception {
+	void answers503AndKeepsOnlyAFailedChallenge() throws Exception {
 		MobileNumber mobile = TestNumbers.next();
 
 		mvc.perform(post("/v1/auth/otp/request").contentType(MediaType.APPLICATION_JSON)
@@ -54,9 +54,13 @@ class OtpRequestWithoutSenderTest {
 				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 				.andExpect(jsonPath("$.title").value("Code could not be sent"));
 
-		long challenges = jdbc.sql("SELECT count(*) FROM identity.otp_challenge WHERE target_hash = :hash")
+		// the challenge is kept, but marked as failed: it cannot be used and still counts toward the limit
+		long usable = jdbc.sql("SELECT count(*) FROM identity.otp_challenge WHERE target_hash = :hash AND delivery_failed_at IS NULL")
 				.param("hash", hasher.hashMobile(mobile)).query(Long.class).single();
-		assertThat(challenges).isZero();
+		long failed = jdbc.sql("SELECT count(*) FROM identity.otp_challenge WHERE target_hash = :hash AND delivery_failed_at IS NOT NULL AND used_at IS NULL")
+				.param("hash", hasher.hashMobile(mobile)).query(Long.class).single();
+		assertThat(usable).isZero();
+		assertThat(failed).isEqualTo(1);
 	}
 
 }

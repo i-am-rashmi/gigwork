@@ -1,7 +1,9 @@
 package com.gigwork.core.identity.web;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
@@ -10,6 +12,7 @@ import com.gigwork.core.identity.domain.InvalidMobileNumberException;
 import com.gigwork.core.identity.domain.InvalidOtpException;
 import com.gigwork.core.identity.domain.InvalidRefreshTokenException;
 import com.gigwork.core.identity.domain.OtpDeliveryUnavailableException;
+import com.gigwork.core.identity.domain.OtpRateLimitedException;
 
 /**
  * Error responses of the auth endpoints as RFC 9457 problem details. Messages are fixed text: they never echo
@@ -37,6 +40,15 @@ class AuthExceptionHandler extends ResponseEntityExceptionHandler {
 	ProblemDetail deliveryUnavailable() {
 		return problem(HttpStatus.SERVICE_UNAVAILABLE, "Code could not be sent",
 				"We could not send a code right now. Please try again later.");
+	}
+
+	@ExceptionHandler(OtpRateLimitedException.class)
+	ResponseEntity<ProblemDetail> tooManyCodeRequests(OtpRateLimitedException ex) {
+		ProblemDetail problem = problem(HttpStatus.TOO_MANY_REQUESTS, "Too many code requests",
+				"Too many code requests. Please try again later.");
+		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+				.header(HttpHeaders.RETRY_AFTER, Long.toString(ex.retryAfter().toSeconds()))
+				.body(problem);
 	}
 
 	private static ProblemDetail problem(HttpStatus status, String title, String detail) {

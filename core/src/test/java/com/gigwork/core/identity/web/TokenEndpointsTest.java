@@ -126,6 +126,7 @@ class TokenEndpointsTest {
 		MobileNumber mobile = TestNumbers.next();
 		Login first = login(mobile);
 
+		clock.advance(Duration.ofSeconds(30)); // a new code is allowed 30 seconds after the previous one
 		Login second = login(mobile);
 
 		assertThat(first.newAccount()).isTrue();
@@ -141,6 +142,7 @@ class TokenEndpointsTest {
 	void tokenResponsesAreNeverCached() throws Exception {
 		MobileNumber mobile = TestNumbers.next();
 		postJson("/v1/auth/otp/request", json("mobile", mobile.value()));
+		clock.advance(Duration.ofSeconds(30)); // a new code is allowed 30 seconds after the previous one
 		String challenge = JsonPath.read(
 				postJson("/v1/auth/otp/request", json("mobile", mobile.value())).andReturn().getResponse().getContentAsString(),
 				"$.challengeId");
