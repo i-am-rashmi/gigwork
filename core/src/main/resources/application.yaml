@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: gigwork-core
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/gigwork_core}
+    username: ${DB_USER:core_app}
+    password: ${DB_PASSWORD:core_app}
+
+  jpa:
+    # Flyway owns the schema; Hibernate only checks that entities match it
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  threads:
+    virtual:
+      enabled: true   # Java 21 virtual threads for request handling
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true   # /actuator/health/liveness and /readiness for the router and rolling deploys
