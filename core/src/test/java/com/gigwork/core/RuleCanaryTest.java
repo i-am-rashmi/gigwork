@@ -45,6 +45,12 @@ class RuleCanaryTest {
 	}
 
 	@Test
+	void infrastructureEndpointsOutsidePlatformAreDetected() {
+		assertFails(ArchitectureRules.ONLY_PLATFORM_DECLARES_INFRASTRUCTURE_ENDPOINTS,
+				"DeclaresInfrastructureEndpoints");
+	}
+
+	@Test
 	void genericExceptionIsDetected() {
 		assertFails(ArchitectureRules.NO_GENERIC_EXCEPTIONS, "ThrowsGenericException");
 	}
