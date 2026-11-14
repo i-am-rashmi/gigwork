@@ -100,38 +100,3 @@ def filter_by_prefix(offices: list[dict], prefixes) -> tuple[list[dict], int]:
     kept = [o for o in offices if o["pin"].startswith(prefixes)]
     return kept, len(offices) - len(kept)
 
-
-def load_overrides(path: Path) -> list[dict]:
-    """Manual PIN fixes: CSV with header name,pin,reason. A missing or header-only file means none."""
-    if not path.exists():
-        return []
-    out = []
-    with open(path, newline="", encoding="utf-8") as f:
-        for i, row in enumerate(csv.DictReader(f), start=2):
-            name = " ".join((row.get("name") or "").split())
-            pin = (row.get("pin") or "").strip()
-            if not name and not pin:
-                continue
-            if not name or not PIN_RE.match(pin):
-                raise ValueError(f"{path}:{i}: need a name and a 6-digit PIN, got name={name!r} pin={pin!r}")
-            out.append({"name": name, "pin": pin, "reason": (row.get("reason") or "").strip()})
-    return out
-
-
-def apply_overrides(rows: list[dict], overrides: list[dict]):
-    """Apply overrides by exact (case-insensitive) name, to every row with that name.
-
-    Returns (rows, applied, unmatched); applied = [(name, old_pin, new_pin, reason, rows_changed)].
-    """
-    rows = [dict(r) for r in rows]
-    applied, unmatched = [], []
-    for o in overrides:
-        hit = [r for r in rows if r["name"].casefold() == o["name"].casefold()]
-        if not hit:
-            unmatched.append(o)
-            continue
-        old = sorted({r["pin"] for r in hit})
-        for r in hit:
-            r.update(pin=o["pin"], pin_office="override", pin_distance_m=None, pin_source="override")
-        applied.append((o["name"], ", ".join(x or "(none)" for x in old), o["pin"], o["reason"], len(hit)))
-    return rows, applied, unmatched

@@ -56,24 +56,59 @@ def test_is_generic():
 
 def test_generic_gets_nearest_parent_within_radius():
     places = [Q("Jayanagar", 0, 0), Q("Far Place", 1_500, 0), P("4th Block", 400, 0)]
-    out, prefixed, dropped = clean.prefix_generic(places, 2_000)
+    out, rows, dropped = clean.prefix_generic(places, 2_000)
     assert "Jayanagar 4th Block" in [p["name"] for p in out]
-    assert prefixed == [("4th Block", "Jayanagar 4th Block", 400)] and dropped == []
+    assert [(r.original, r.new, r.parent, r.distance_m) for r in rows] == [("4th Block", "Jayanagar 4th Block", "Jayanagar", 400)] and dropped == []
 
 
 def test_generic_without_parent_in_range_is_dropped():
-    out, prefixed, dropped = clean.prefix_generic([Q("Jayanagar", 0, 0), P("Sector 2", 2_500, 0)], 2_000)
-    assert [p["name"] for p in out] == ["Jayanagar"] and dropped == ["Sector 2"]
+    out, rows, dropped = clean.prefix_generic([Q("Jayanagar", 0, 0), P("Sector 2", 2_500, 0)], 2_000)
+    assert [p["name"] for p in out] == ["Jayanagar"] and [n for _, n in dropped] == ["Sector 2"] and rows == []
 
 
 def test_parent_must_not_be_a_block_village_or_generic():
-    places = [Q("Jayanagar 1st Block", 10, 0), P("Hamlet", 20, 0, "hamlet"), Q("Sector 1", 30, 0), Q("Real Parent", 900, 0), P("4th Block", 0, 0)]
-    out, prefixed, _ = clean.prefix_generic(places, 2_000)
-    assert [n for o, n, _ in prefixed if o == "4th Block"] == ["Real Parent 4th Block"]
+    places = [Q("Jayanagar 1st Block", 10, 0), P("Hamlet", 20, 0, "hamlet"), P("Vill", 25, 0, "village"), Q("Sector 1", 30, 0), Q("Real Parent", 900, 0), P("4th Block", 0, 0)]
+    _, rows, _ = clean.prefix_generic(places, 2_000)
+    assert [r.new for r in rows if r.original == "4th Block"] == ["Real Parent 4th Block"]
 
 
-def test_prefixed_name_merges_with_existing_duplicate_after_dedupe():
+def test_suburb_beats_a_nearer_neighbourhood():
+    places = [Q("Near Nbhd", 100, 0), P("Big Suburb", 1_800, 0, "suburb"), P("2nd Block", 0, 0)]
+    _, rows, _ = clean.prefix_generic(places, 2_000)
+    assert rows[0].new == "Big Suburb 2nd Block"
+    # but a suburb outside the radius loses to a neighbourhood inside it
+    _, rows, _ = clean.prefix_generic([Q("Near Nbhd", 100, 0), P("Big Suburb", 2_500, 0, "suburb"), P("2nd Block", 0, 0)], 2_000)
+    assert rows[0].new == "Near Nbhd 2nd Block"
+
+
+def test_family_shares_one_parent_by_majority_vote():
+    # Sectors 1-3 are close together; two are nearest to HSR, one is nearest to Agara. All three get HSR.
+    places = [P("HSR Layout", 0, 0, "suburb"), P("Agara", 1_900, 0, "suburb"),
+              P("Sector 1", 300, 0), P("Sector 2", 600, 0), P("Sector 3", 1_100, 0)]
+    out, rows, _ = clean.prefix_generic(places, 2_000)
+    assert {r.new for r in rows} == {"HSR Layout Sector 1", "HSR Layout Sector 2", "HSR Layout Sector 3"}
+    assert [r.own_parent for r in rows if r.original == "Sector 3"] == ["Agara"]
+    assert all(r.family_size == 3 for r in rows)
+
+
+def test_families_do_not_vote_across_kinds_or_far_apart():
+    places = [P("A", 0, 0, "suburb"), P("B", 10_000, 0, "suburb"), P("Sector 1", 100, 0), P("Sector 2", 10_100, 0), P("2nd Phase", 200, 0)]
+    _, rows, _ = clean.prefix_generic(places, 2_000)
+    assert {r.new for r in rows} == {"A Sector 1", "B Sector 2", "A 2nd Phase"}
+
+
+def test_vote_winner_out_of_range_for_a_member_keeps_its_own_parent():
+    places = [P("A", 0, 0, "suburb"), P("A2", 0, 100, "suburb"), P("B", 3_000, 0, "suburb"),
+              P("Sector 1", 100, 0), P("Sector 2", 150, 0), P("Sector 3", 1_900, 0), P("Sector 4", 2_900, 0)]
+    _, rows, _ = clean.prefix_generic(places, 2_000)
+    by = {r.original: r.new for r in rows}
+    assert by["Sector 4"] == "B Sector 4"  # A is 2.9 km away, so Sector 4 keeps its own match
+
+
+def test_prefixed_name_merges_with_existing_duplicate_after_dedupe_and_keeps_osm_ids():
     places = [Q("Jayanagar", 0, 0), Q("Jayanagar 4th Block", 100, 0), P("4th Block", 200, 0)]
     out, _, _ = clean.prefix_generic(places, 2_000)
     merged, groups = clean.dedupe(out, 1000)
     assert sorted(p["name"] for p in merged) == ["Jayanagar", "Jayanagar 4th Block"] and groups[0].count == 2
+    block = [m for m in merged if m["name"] == "Jayanagar 4th Block"][0]
+    assert len(block["osm_ids"]) == 2

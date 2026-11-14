@@ -59,10 +59,12 @@ def build_report(ctx: dict) -> str:
     L += [f"- **Localities written: {ctx['n_final']:,}**", ""]
 
     L += ["### Generic names: examples", ""]
-    ex = sorted(ctx["prefixed"], key=lambda t: (t[1], t[0]))
-    ex = ex[:: max(1, len(ex) // 20)][:20]
-    L += ([f"- {o} -> **{n}** (parent {d:,.0f} m away)" for o, n, d in ex] or ["None prefixed."])
-    L += ["", f"Dropped (no parent in range), first 20 of {len(ctx['generic_dropped'])}: " + (", ".join(sorted(ctx["generic_dropped"])[:20]) or "none"), ""]
+    pr = ctx["prefixed"]
+    ex = pr[:: max(1, len(pr) // 20)][:20]
+    L += ([f"- `{r.osm}` {r.original} -> **{r.new}** ({r.distance_m:,.0f} m)" for r in ex] or ["None prefixed."])
+    voted = sum(1 for r in pr if r.parent != r.own_parent)
+    L += ["", f"All {len(pr)} rows are in `prefixed.csv`. {voted} took their family's majority parent instead of their own nearest match.",
+          f"Dropped (no parent in range): {len(ctx['generic_dropped'])}" + "".join(f"\n- `{o}` {n}" for o, n in ctx["generic_dropped"][:20]), ""]
     L += ["### Duplicate merge groups", ""]
     if ctx["groups"]:
         L += ["| Names | Members | Max pairwise distance (m) |", "|---|---:|---:|"]
@@ -88,23 +90,21 @@ def build_report(ctx: dict) -> str:
           f"- Localities **without** a PIN (no valid office within {ctx['params']['max PIN distance (m)']} m, and no override): {len(rows) - len(with_pin):,}", ""]
     L += ["### Localities without a PIN", ""]
     none = [r for r in rows if not r["pin"]]
-    L += ([f"- {r['name']} ({r['lat']:.6f}, {r['lng']:.6f})" for r in none] or ["None."])
+    L += ([f"- {r['name']} ({r['lat']:.6f}, {r['lng']:.6f}) `{';'.join(r['osm_ids'])}`" for r in none] or ["None."])
     L += ["", f"### PIN taken from more than {FAR_PIN_M // 1000} km away", ""]
     far = sorted((r for r in auto_pin if r["pin_distance_m"] > FAR_PIN_M), key=lambda r: -r["pin_distance_m"])
-    L += ([f"- {r['name']}: {r['pin']} ({r['pin_office']}), {r['pin_distance_m'] / 1000:.2f} km" for r in far] or ["None."])
+    L += ([f"- {r['name']} `{';'.join(r['osm_ids'])}`: {r['pin']} ({r['pin_office']}), {r['pin_distance_m'] / 1000:.2f} km" for r in far] or ["None."])
     dist = Counter()
     for r in auto_pin:
         dist["≤ 1 km" if r["pin_distance_m"] <= 1000 else "1–2 km" if r["pin_distance_m"] <= 2000 else "> 2 km"] += 1
     L += ["", "Distance to the PIN's post office: " + ", ".join(f"{k}: {dist[k]:,}" for k in ("≤ 1 km", "1–2 km", "> 2 km")), ""]
-    L += ["## PIN overrides (config/<city>/pin-overrides.csv)", ""]
+    L += ["## Overrides (config/<city>/overrides.csv)", ""]
     if ctx["ov_applied"]:
-        L += ["| Name | Old PIN | New PIN | Rows | Reason |", "|---|---|---|---:|---|"]
-        L += [f"| {n} | {o} | {p} | {k} | {why} |" for n, o, p, why, k in ctx["ov_applied"]]
+        L += ["| osm_id | Name | PIN | Reason |", "|---|---|---|---|"]
+        for osm, on, nn, op, np_, why in ctx["ov_applied"]:
+            L.append(f"| `{osm}` | {on if on == nn else f'{on} -> {nn}'} | {(op or '(none)') if op == np_ else f'{op or chr(40) + "none" + chr(41)} -> {np_}'} | {why} |")
     else:
         L.append("None applied.")
-    if ctx["ov_unmatched"]:
-        L += ["", "**Overrides that matched no locality (check the spelling):**"]
-        L += [f"- {o['name']} ({o['pin']})" for o in ctx["ov_unmatched"]]
     L.append("")
     return "\n".join(L)
 
@@ -123,10 +123,22 @@ def write_map(zones_4326, rows: list[dict], path: Path) -> None:
     for r in rows:
         has = bool(r["pin"])
         dist = "manual override" if r.get("pin_source") == "override" else f"{r['pin_distance_m']:,.0f} m" if has else "n/a"
-        popup = f"<b>{r['name']}</b><br>PIN: {r['pin'] or '(none)'}<br>Source distance: {dist}"
+        popup = f"<b>{r['name']}</b><br><code>{';'.join(r['osm_ids'])}</code><br>PIN: {r['pin'] or '(none)'}<br>Source distance: {dist}"
         folium.CircleMarker(
             [r["lat"], r["lng"]], radius=5, color="#1b7f3b" if has else "#c0392b",
             fill=True, fill_opacity=0.85, popup=folium.Popup(popup, max_width=260),
         ).add_to(m)
     path.parent.mkdir(parents=True, exist_ok=True)
     m.save(str(path))
+
+
+def write_prefixed_csv(rows, path: Path) -> None:
+    """Every generic name that got a parent, for review. Deterministic."""
+    import csv
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f, lineterminator="\n")
+        w.writerow(["osm_id", "original_name", "new_name", "parent", "distance_m", "own_nearest_parent", "family_size"])
+        for r in rows:
+            w.writerow([r.osm, r.original, r.new, r.parent, f"{r.distance_m:.0f}", r.own_parent, r.family_size])

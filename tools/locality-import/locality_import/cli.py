@@ -11,7 +11,7 @@ from pathlib import Path
 import geopandas as gpd
 from shapely.geometry import box
 
-from . import clean, config, output, pins, places, review, zones
+from . import clean, config, output, overrides as ovr, pins, places, review, zones
 from .geo import lonlat_to_xy, xy_to_lonlat
 
 TOOL_DIR = Path(__file__).resolve().parent.parent
@@ -98,8 +98,7 @@ def run(args, fetcher=places.fetch_overpass) -> dict:
     for a in assigned:
         lon, lat = xy_to_lonlat(a["x"], a["y"], crs)
         rows.append({**a, "lat": round(lat, 6), "lng": round(lon, 6)})
-    overrides = pins.load_overrides(cfg_dir / "pin-overrides.csv")
-    rows, ov_applied, ov_unmatched = pins.apply_overrides(rows, overrides)
+    rows, ov_applied = ovr.apply_overrides(rows, ovr.load_overrides(cfg_dir / "overrides.csv"))
 
     # 5. Committed outputs, then review files.
     output.write_zones_geojson(out_zones, seed_dir / "zones.geojson")
@@ -116,10 +115,11 @@ def run(args, fetcher=places.fetch_overpass) -> dict:
         "n_inside": len(inside), "n_outside": len(parsed) - len(inside), "n_unnamed": len(inside) - len(named_all),
         "n_named": len(named_all), "n_after_generic": len(named), "n_final": len(merged), "groups": groups,
         "prefix_source": prefix_source, "prefixed": prefixed, "generic_dropped": generic_dropped,
-        "ov_applied": ov_applied, "ov_unmatched": ov_unmatched,
+        "ov_applied": ov_applied,
         "office_counts": office_counts, "localities": rows,
     }
     review_dir.mkdir(parents=True, exist_ok=True)
+    review.write_prefixed_csv(prefixed, review_dir / "prefixed.csv")
     (review_dir / "report.md").write_text(review.build_report(ctx), encoding="utf-8")
     review.write_map(out_zones, rows, review_dir / "map.html")
     ctx["seed_dir"], ctx["review_dir"] = seed_dir, review_dir
@@ -130,7 +130,7 @@ def main(argv=None) -> int:
     args = parse_args(argv)
     try:
         ctx = run(args)
-    except zones.ZoneError as exc:
+    except (zones.ZoneError, ovr.OverrideError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     print(f"{ctx['n_final']} localities -> {ctx['seed_dir']}")
