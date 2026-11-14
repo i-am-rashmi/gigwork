@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -98,6 +99,67 @@ public class GigStore {
 				UPDATE gigs.gig SET status = 'CANCELLED', closed_at = :now, updated_at = :now, close_reason = :reason
 				WHERE id = :id AND poster_id = :poster AND status = 'OPEN'""")
 				.param("id", id).param("poster", posterId).param("reason", reason).param("now", ts(now)).update() == 1;
+	}
+
+	/**
+	 * Open gigs, newest first (FR-9), after {@code after} when given, at most {@code limit}. Keyset pagination on
+	 * {@code (published_at, id)}: a gig published between two pages is newer than the cursor so it never shifts a
+	 * page, and a page never repeats or skips a gig.
+	 *
+	 * <p>With a location filter the query is two branches, each served by its own partial index and cut to
+	 * {@code limit} before they are merged: on-site gigs in the wanted cities and zones, and remote gigs.
+	 */
+	public List<StoredGig> listOpen(GigFilter filter, Keyset after, int limit) {
+		StringBuilder categories = new StringBuilder();
+		Map<String, Object> params = new HashMap<>();
+		if (!filter.categoryIds().isEmpty()) {
+			categories.append(" AND category_id IN (:categories)");
+			params.put("categories", filter.categoryIds());
+		}
+		String cursor = cursor(after, params);
+		params.put("limit", limit);
+		String order = " ORDER BY published_at DESC, id DESC LIMIT :limit";
+		if (!filter.hasLocation()) {
+			return jdbc.sql("SELECT " + COLUMNS + " FROM gigs.gig WHERE status = 'OPEN'" + categories + cursor + order)
+					.params(params).query(GigStore::map).list();
+		}
+		StringBuilder place = new StringBuilder(" AND work_mode = 'ON_SITE'");
+		if (filter.cityIds().isEmpty()) {
+			place.append(" AND FALSE");
+		}
+		else {
+			place.append(" AND city_id IN (:cities)");
+			params.put("cities", filter.cityIds());
+		}
+		if (!filter.zoneIds().isEmpty()) {
+			place.append(" AND zone_id IN (:zones)");
+			params.put("zones", filter.zoneIds());
+		}
+		String sql = "SELECT " + COLUMNS + " FROM ("
+				+ "(SELECT " + COLUMNS + " FROM gigs.gig WHERE status = 'OPEN'" + place + categories + cursor + order + ") "
+				+ "UNION ALL "
+				+ "(SELECT " + COLUMNS + " FROM gigs.gig WHERE status = 'OPEN' AND work_mode = 'REMOTE'" + categories + cursor + order + ")"
+				+ ") page" + order;
+		return jdbc.sql(sql).params(params).query(GigStore::map).list();
+	}
+
+	/** The Poster's own gigs in every status, newest first, with the same paging as {@link #listOpen}. */
+	public List<StoredGig> listByPoster(UUID posterId, Keyset after, int limit) {
+		Map<String, Object> params = new HashMap<>();
+		params.put("poster", posterId);
+		String cursor = cursor(after, params);
+		params.put("limit", limit);
+		return jdbc.sql("SELECT " + COLUMNS + " FROM gigs.gig WHERE poster_id = :poster" + cursor
+				+ " ORDER BY published_at DESC, id DESC LIMIT :limit").params(params).query(GigStore::map).list();
+	}
+
+	private static String cursor(Keyset after, Map<String, Object> params) {
+		if (after == null) {
+			return "";
+		}
+		params.put("afterAt", ts(after.publishedAt()));
+		params.put("afterId", after.id());
+		return " AND (published_at, id) < (:afterAt, :afterId)";
 	}
 
 	public Optional<StoredGig> find(UUID id) {

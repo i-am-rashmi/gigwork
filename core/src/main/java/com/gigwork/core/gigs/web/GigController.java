@@ -1,29 +1,38 @@
 package com.gigwork.core.gigs.web;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.gigwork.core.gigs.application.GigDraft;
+import com.gigwork.core.gigs.application.GigQuery;
 import com.gigwork.core.gigs.application.GigService;
 import com.gigwork.core.gigs.web.dto.CancelRequest;
+import com.gigwork.core.gigs.web.dto.GigListResponse;
 import com.gigwork.core.gigs.web.dto.GigRequest;
 import com.gigwork.core.gigs.web.dto.GigResponse;
 import com.gigwork.core.platform.CurrentAccount;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
-/** Publishing, editing and cancelling gigs (FR-15, FR-16, FR-18, FR-19). These need a token. */
+/**
+ * Browsing open gigs (FR-9, public) and publishing, editing and cancelling them (FR-15, FR-16, FR-18, FR-19; these
+ * need a token).
+ */
 @RestController
 @RequestMapping("/gigs")
 @Tag(name = "Gigs")
@@ -42,6 +51,31 @@ class GigController {
 				r.startAt().toInstant(), r.endAt().toInstant(), r.workMode(), place == null ? null : place.localityId(),
 				point == null ? null : point.lat(), point == null ? null : point.lng(), r.taOffered(), r.budgetMin(),
 				r.budgetMax());
+	}
+
+	@Operation(summary = "List open gigs, newest first",
+			description = "Public. Filter by category (repeatable), city and zones (repeatable); remote gigs are always "
+					+ "included when a city or zone is given. Pages use an opaque cursor: pass nextCursor back as "
+					+ "cursor. Visitors see no Poster name; logged-in users see the Poster's first name. Exact "
+					+ "locations and applicant counts are never shown.")
+	@ApiResponse(responseCode = "400", description = "A bad cursor, page size or filter")
+	@SecurityRequirements
+	@GetMapping
+	GigListResponse list(@RequestParam(required = false) List<UUID> categoryId, @RequestParam(required = false) UUID cityId,
+			@RequestParam(required = false) List<UUID> zoneId, @RequestParam(required = false) String cursor,
+			@RequestParam(required = false) Integer size) {
+		return GigListResponse.of(gigs.open(new GigQuery(categoryId == null ? List.of() : categoryId, cityId,
+				zoneId == null ? List.of() : zoneId, cursor, size), CurrentAccount.optional()));
+	}
+
+	@Operation(summary = "View a gig",
+			description = "Public for an open gig. A gig that is not open is visible only to its Poster; for anyone "
+					+ "else it does not exist.")
+	@ApiResponse(responseCode = "404", description = "No such gig, or it is not open and not yours")
+	@SecurityRequirements
+	@GetMapping("/{id}")
+	GigResponse view(@PathVariable UUID id) {
+		return GigResponse.of(gigs.gig(id, CurrentAccount.optional()));
 	}
 
 	@Operation(summary = "Publish a gig",

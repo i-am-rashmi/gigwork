@@ -3,6 +3,8 @@ package com.gigwork.core.gigs.application;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,9 +21,12 @@ import com.gigwork.core.gigs.domain.GigNotOpenException;
 import com.gigwork.core.gigs.domain.GigRules;
 import com.gigwork.core.gigs.domain.GigStatus;
 import com.gigwork.core.gigs.domain.InvalidGigException;
+import com.gigwork.core.gigs.domain.PageCursor;
 import com.gigwork.core.gigs.domain.PosterNameRequiredException;
 import com.gigwork.core.gigs.domain.WorkMode;
 import com.gigwork.core.gigs.persistence.GigFields;
+import com.gigwork.core.gigs.persistence.GigFilter;
+import com.gigwork.core.gigs.persistence.Keyset;
 import com.gigwork.core.gigs.persistence.GigStore;
 import com.gigwork.core.gigs.persistence.StoredGig;
 import com.gigwork.core.identity.AccountNames;
@@ -31,6 +36,7 @@ import com.gigwork.core.reference.LocationResolver;
 import com.gigwork.core.reference.ReferenceData;
 import com.gigwork.core.reference.ResolvedLocation;
 import com.gigwork.core.reference.SpecialisationInfo;
+import com.gigwork.core.reference.ZoneInfo;
 
 /**
  * Publishing, editing and cancelling gigs (FR-15, FR-16, FR-18, FR-19).
@@ -144,6 +150,82 @@ public class GigService {
 		}
 		// still open and unchanged in the ways we check: it changed again while we were looking
 		return new GigNotOpenException();
+	}
+
+	// ---- reading ----------------------------------------------------------------------------------------------
+
+	static final int MAX_FILTER_VALUES = 50;
+
+	/** Open gigs, newest first, filtered (FR-9, FR-11 in Phase 1). Anyone may ask; {@code viewer} is empty for a visitor. */
+	public GigPage open(GigQuery query, Optional<UUID> viewer) {
+		int size = pageSize(query.size());
+		GigFilter filter = filter(query);
+		Keyset after = keyset(query.cursor());
+		return page(store.listOpen(filter, after, size + 1), size, viewer);
+	}
+
+	/** The Poster's own gigs in every status, newest first. */
+	public GigPage mine(UUID posterId, String cursor, Integer requestedSize) {
+		int size = pageSize(requestedSize);
+		return page(store.listByPoster(posterId, keyset(cursor), size + 1), size, Optional.of(posterId));
+	}
+
+	/** An open gig, or any gig for its own Poster; for everyone else a gig that is not open does not exist. */
+	public GigView gig(UUID gigId, Optional<UUID> viewer) {
+		StoredGig gig = store.find(gigId)
+				.filter(g -> g.status() == GigStatus.OPEN || viewer.filter(g.posterId()::equals).isPresent())
+				.orElseThrow(GigNotFoundException::new);
+		return views.of(gig, viewer);
+	}
+
+	private GigPage page(List<StoredGig> fetched, int size, Optional<UUID> viewer) {
+		boolean more = fetched.size() > size;
+		List<StoredGig> shown = more ? fetched.subList(0, size) : fetched;
+		String next = more ? new PageCursor(shown.get(size - 1).publishedAt(), shown.get(size - 1).id()).encode() : null;
+		return new GigPage(views.of(shown, viewer), next);
+	}
+
+	private int pageSize(Integer requested) {
+		if (requested == null) {
+			return properties.defaultPageSize();
+		}
+		if (requested < 1 || requested > properties.maxPageSize()) {
+			throw new InvalidGigException("The page size must be between 1 and " + properties.maxPageSize() + ".");
+		}
+		return requested;
+	}
+
+	private static Keyset keyset(String cursor) {
+		if (cursor == null || cursor.isBlank()) {
+			return null;
+		}
+		PageCursor decoded = PageCursor.decode(cursor);
+		return new Keyset(decoded.publishedAt(), decoded.id());
+	}
+
+	/**
+	 * The zones' cities are worked out here so the query can use the city index; a zone that doesn't exist matches no
+	 * on-site gig (a remote gig still matches, as with any location filter).
+	 */
+	private GigFilter filter(GigQuery query) {
+		List<UUID> categories = distinct(query.categoryIds(), "categoryId");
+		List<UUID> zones = distinct(query.zoneIds(), "zoneId");
+		List<UUID> cities = new ArrayList<>();
+		if (query.cityId() != null) {
+			cities.add(query.cityId());
+		}
+		else {
+			zones.stream().map(reference::zone).flatMap(Optional::stream).map(ZoneInfo::cityId).distinct().forEach(cities::add);
+		}
+		return new GigFilter(categories, cities, zones);
+	}
+
+	private static List<UUID> distinct(List<UUID> values, String name) {
+		List<UUID> distinct = values == null ? List.of() : values.stream().distinct().toList();
+		if (distinct.size() > MAX_FILTER_VALUES) {
+			throw new InvalidGigException("At most " + MAX_FILTER_VALUES + " values can be given for " + name + ".");
+		}
+		return distinct;
 	}
 
 	// ---- the rules that need reference data ----------------------------------------------------------------

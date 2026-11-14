@@ -12,7 +12,7 @@ import com.gigwork.core.gigs.domain.InvalidGigException;
 import com.gigwork.core.gigs.domain.PosterNameRequiredException;
 
 /** Broken rules are 400, a gig that isn't there or isn't the caller's is 404, one that isn't open any more is 409. */
-@RestControllerAdvice(assignableTypes = GigController.class)
+@RestControllerAdvice(assignableTypes = { GigController.class, MyGigsController.class })
 class GigsExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(InvalidGigException.class)
