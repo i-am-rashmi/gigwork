@@ -13,4 +13,5 @@ Each ADR records one significant decision: the context, the options considered, 
 | [0007](0007-inbox-api-and-routing.md) | The worker serves the inbox API behind a single path-based router | Accepted |
 | [0008](0008-persistence-convention.md) | JPA by default; single native SQL statements for writes that enforce invariants | Accepted |
 | [0009](0009-endpoint-security.md) | Security configured in the Platform module; each module declares its own public endpoints | Accepted |
+| [0010](0010-scheduled-jobs.md) | Scheduled jobs are idempotent SQL sweeps, run by one instance at a time through ShedLock | Accepted |
 Related design documents: [PRD](../prd.md) · [Components and flows](../design/components-and-flows.md) · [Data model](../design/data-model.md)
