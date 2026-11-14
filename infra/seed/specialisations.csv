@@ -1,0 +1,142 @@
+category_slug,slug,name,display_order
+photographer,wedding,Wedding,1
+photographer,pre-wedding,Pre-wedding,2
+photographer,candid,Candid,3
+photographer,portrait,Portrait,4
+photographer,maternity-and-baby,Maternity & baby,5
+photographer,product,Product,6
+photographer,food,Food,7
+photographer,fashion,Fashion,8
+photographer,corporate-and-events,Corporate & events,9
+videographer,wedding-films,Wedding films,1
+videographer,pre-wedding,Pre-wedding,2
+videographer,event-coverage,Event coverage,3
+videographer,corporate,Corporate,4
+videographer,music-videos,Music videos,5
+videographer,drone,Drone,6
+videographer,reels-and-short-form,Reels & short-form,7
+makeup-artist,bridal,Bridal,1
+makeup-artist,party,Party,2
+makeup-artist,hd-airbrush,HD / airbrush,3
+makeup-artist,editorial-and-fashion,Editorial & fashion,4
+makeup-artist,saree-draping,Saree draping,5
+hair-stylist,bridal,Bridal,1
+hair-stylist,party,Party,2
+hair-stylist,editorial-and-fashion,Editorial & fashion,3
+hair-stylist,hair-extensions,Hair extensions,4
+hair-stylist,kids,Kids,5
+mehendi-artist,bridal,Bridal,1
+mehendi-artist,arabic,Arabic,2
+mehendi-artist,traditional-rajasthani,Traditional / Rajasthani,3
+mehendi-artist,minimal-and-contemporary,Minimal & contemporary,4
+mehendi-artist,guest-mehendi,Guest mehendi,5
+decorator,weddings,Weddings,1
+decorator,floral,Floral,2
+decorator,balloon-decor,Balloon décor,3
+decorator,birthdays,Birthdays,4
+decorator,stage-and-backdrop,Stage & backdrop,5
+decorator,corporate,Corporate,6
+decorator,haldi-and-mehendi-setups,Haldi & mehendi setups,7
+dj,bollywood,Bollywood,1
+dj,punjabi-and-bhangra,Punjabi & bhangra,2
+dj,edm,EDM,3
+dj,house-and-techno,House & techno,4
+dj,hip-hop,Hip-hop,5
+dj,retro,Retro,6
+dj,south-indian,South Indian,7
+anchor,wedding-and-sangeet,Wedding & sangeet,1
+anchor,corporate-events,Corporate events,2
+anchor,birthdays-and-kids-parties,Birthdays & kids' parties,3
+anchor,concerts-and-college-fests,Concerts & college fests,4
+anchor,award-nights,Award nights,5
+band,bollywood,Bollywood,1
+band,rock,Rock,2
+band,sufi,Sufi,3
+band,indie,Indie,4
+band,fusion,Fusion,5
+band,folk,Folk,6
+band,classical,Classical (Carnatic / Hindustani),7
+band,jazz,Jazz,8
+band,retro-and-unplugged,Retro & unplugged,9
+singer,bollywood,Bollywood,1
+singer,ghazal,Ghazal,2
+singer,sufi,Sufi,3
+singer,carnatic,Carnatic,4
+singer,hindustani-classical,Hindustani classical,5
+singer,western-english,Western / English,6
+singer,devotional-and-bhajans,Devotional & bhajans,7
+singer,folk,Folk,8
+singer,sangeet-and-wedding-songs,Sangeet & wedding songs,9
+instrumentalist,guitarist,Guitarist,1
+instrumentalist,keyboardist-pianist,Keyboardist / pianist,2
+instrumentalist,drummer,Drummer,3
+instrumentalist,tabla,Tabla,4
+instrumentalist,mridangam,Mridangam,5
+instrumentalist,flute,Flute,6
+instrumentalist,violin,Violin,7
+instrumentalist,saxophone,Saxophone,8
+instrumentalist,sitar,Sitar,9
+instrumentalist,veena,Veena,10
+instrumentalist,cajon-percussion,Cajón / percussion,11
+dancer,bollywood,Bollywood,1
+dancer,classical,Classical (Bharatanatyam / Kathak / Odissi),2
+dancer,folk,Folk (Dollu Kunitha / Bhangra / Garba),3
+dancer,contemporary,Contemporary,4
+dancer,hip-hop,Hip-hop,5
+dancer,belly-dance,Belly dance,6
+dancer,sangeet-performances,Sangeet performances,7
+choreographer,sangeet,Sangeet,1
+choreographer,bollywood,Bollywood,2
+choreographer,contemporary,Contemporary,3
+choreographer,hip-hop,Hip-hop,4
+choreographer,classical,Classical (Bharatanatyam / Kathak),5
+choreographer,couple-dance,Couple dance,6
+choreographer,flash-mob,Flash mob,7
+choreographer,corporate,Corporate,8
+comedian,corporate-shows,Corporate shows,1
+comedian,private-parties,Private parties,2
+comedian,clean-comedy,Clean comedy,3
+comedian,hosting-comedy,Hosting + comedy,4
+comedian,regional-language,Regional language,5
+magician,kids-parties,Kids' parties,1
+magician,close-up-table-magic,Close-up / table magic,2
+magician,stage-illusions,Stage illusions,3
+magician,mentalism,Mentalism,4
+magician,corporate,Corporate,5
+event-curator,weddings,Weddings,1
+event-curator,birthdays,Birthdays,2
+event-curator,corporate,Corporate,3
+event-curator,baby-shower-and-naming-ceremony,Baby shower & naming ceremony,4
+event-curator,concerts-and-live-shows,Concerts & live shows,5
+painter-caricature,live-caricature,Live caricature,1
+painter-caricature,digital-caricature,Digital caricature,2
+painter-caricature,portrait-painting,Portrait painting,3
+painter-caricature,murals-and-wall-art,Murals & wall art,4
+painter-caricature,live-event-painting,Live event painting,5
+social-media-manager,live-event-coverage-same-day-reels,Live event coverage (same-day reels),1
+social-media-manager,wedding-content-creation,Wedding content creation,2
+social-media-manager,account-management,Account management,3
+social-media-manager,content-calendar-and-strategy,Content calendar & strategy,4
+social-media-manager,paid-ads,Paid ads,5
+social-media-manager,community-management,Community management,6
+social-media-manager,influencer-outreach,Influencer outreach,7
+content-creator,fashion-and-beauty,Fashion & beauty,1
+content-creator,food,Food,2
+content-creator,travel,Travel,3
+content-creator,tech,Tech,4
+content-creator,lifestyle,Lifestyle,5
+content-creator,fitness,Fitness,6
+content-creator,comedy,Comedy,7
+content-creator,ugc-ads,UGC ads,8
+video-editor,reels-and-short-form,Reels & short-form,1
+video-editor,youtube-long-form,YouTube long-form,2
+video-editor,wedding-films,Wedding films,3
+video-editor,corporate,Corporate,4
+video-editor,motion-graphics,Motion graphics,5
+video-editor,colour-grading,Colour grading,6
+content-writer,blogs-and-seo,Blogs & SEO,1
+content-writer,social-media,Social media,2
+content-writer,website-copy,Website copy,3
+content-writer,scripts-youtube-reels,Scripts (YouTube / reels),4
+content-writer,product-descriptions,Product descriptions,5
+content-writer,speeches-and-invitations,Speeches & invitations,6
