@@ -36,6 +36,11 @@ gigwork:
       idle-timeout: 7d
       absolute-timeout: 30d
 
+  reference:
+    location:
+      max-distance-from-zone-km: 50   # a gig's map point farther than this from the nearest live zone is rejected
+      label-radius-meters: 2000       # a map point is labelled with the nearest locality within this distance
+
   profile:
     # Talent profile limits (FR-4 to FR-6); these are also the defaults
     max-categories: 5

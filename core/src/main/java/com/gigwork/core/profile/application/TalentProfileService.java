@@ -1,7 +1,5 @@
 package com.gigwork.core.profile.application;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Clock;
 import java.util.HashSet;
 import java.util.List;
@@ -30,13 +28,11 @@ import com.gigwork.core.profile.domain.ProfileText;
 import com.gigwork.core.profile.domain.ProfileType;
 import com.gigwork.core.profile.persistence.ProfileStore;
 import com.gigwork.core.profile.persistence.StoredProfile;
-import com.gigwork.core.reference.AreaResolution;
 import com.gigwork.core.reference.CategoryInfo;
-import com.gigwork.core.reference.InvalidCoordinatesException;
 import com.gigwork.core.reference.LanguageInfo;
-import com.gigwork.core.reference.LocalityInfo;
-import com.gigwork.core.reference.NoZonesDefinedException;
+import com.gigwork.core.reference.LocationResolver;
 import com.gigwork.core.reference.ReferenceData;
+import com.gigwork.core.reference.ResolvedLocation;
 import com.gigwork.core.reference.SpecialisationInfo;
 import com.gigwork.core.reference.ZoneInfo;
 
@@ -58,6 +54,7 @@ public class TalentProfileService implements TalentProfiles {
 	private final ReferenceData reference;
 	private final AccountNames names;
 	private final ProfileProperties properties;
+	private final LocationResolver locations;
 	private final TransactionTemplate transaction;
 	private final Clock clock;
 
@@ -67,6 +64,8 @@ public class TalentProfileService implements TalentProfiles {
 		this.reference = reference;
 		this.names = names;
 		this.properties = properties;
+		this.locations = new LocationResolver(reference, properties.location().maxDistanceFromZoneKm(),
+				properties.location().labelRadiusMeters());
 		this.transaction = transaction;
 		this.clock = clock;
 	}
@@ -223,52 +222,19 @@ public class TalentProfileService implements TalentProfiles {
 	// ---- location section ---------------------------------------------------------------------------------------
 
 	private ProfileStore.Location resolve(LocationCommand c) {
-		boolean hasLocality = c.localityId() != null;
-		boolean hasPoint = c.lat() != null || c.lng() != null;
-		if (hasLocality == hasPoint) {
-			throw new InvalidLocationException("Give either a locality or a map point, not both and not neither.");
-		}
 		try {
-			if (hasLocality) {
-				LocalityInfo locality = reference.locality(c.localityId()).orElseThrow(
-						() -> new InvalidLocationException("That locality does not exist or is no longer offered."));
-				AreaResolution area = reference.resolveArea(locality.lat(), locality.lng());
-				return new ProfileStore.Location(locality.lat(), locality.lng(), area.cityId(), area.zoneId(),
-						locality.name(), locality.id(), c.serviceRadiusKm(), c.willingToTravel());
-			}
-			if (c.lat() == null || c.lng() == null) {
-				throw new InvalidLocationException("A map point needs both a latitude and a longitude.");
-			}
-			double lat = round3(c.lat());
-			double lng = round3(c.lng());
-			AreaResolution area = reference.resolveArea(lat, lng);
-			double maxMeters = properties.location().maxDistanceFromZoneKm() * 1000;
-			if (area.distanceToZoneMeters() > maxMeters) {
-				throw new InvalidLocationException("That point is more than "
-						+ trim(properties.location().maxDistanceFromZoneKm())
-						+ " km from the nearest area we serve. Choose a place closer to a city we serve.");
-			}
-			String label = reference.nearestLocality(lat, lng, properties.location().labelRadiusMeters())
-					.map(LocalityInfo::name)
-					.orElseGet(() -> reference.zone(area.zoneId()).map(ZoneInfo::name).orElse("Unknown area"));
-			return new ProfileStore.Location(lat, lng, area.cityId(), area.zoneId(), label, null, c.serviceRadiusKm(),
-					c.willingToTravel());
+			ResolvedLocation place = locations.resolve(c.localityId(), c.lat(), c.lng());
+			return new ProfileStore.Location(place.lat(), place.lng(), place.cityId(), place.zoneId(), place.label(),
+					place.localityId(), c.serviceRadiusKm(), c.willingToTravel());
 		}
-		catch (InvalidCoordinatesException e) {
-			throw new InvalidLocationException("Those coordinates are not a valid place on Earth.");
-		}
-		catch (NoZonesDefinedException e) {
-			throw new InvalidLocationException("We don't serve any area yet.");
+		catch (com.gigwork.core.reference.InvalidLocationException e) {
+			throw new InvalidLocationException(e.getMessage());
 		}
 	}
 
 	/** Map points are kept to 3 decimals (about 110 m): enough for matching, too coarse to find a home (FR-5). */
 	static double round3(double value) {
-		return BigDecimal.valueOf(value).setScale(3, RoundingMode.HALF_UP).doubleValue();
-	}
-
-	private static String trim(double km) {
-		return km == Math.rint(km) ? Long.toString((long) km) : Double.toString(km);
+		return LocationResolver.round3(value);
 	}
 
 	// ---- portfolio section ----------------------------------------------------------------------------------------
