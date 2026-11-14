@@ -58,7 +58,8 @@ The base package holds only the module's public API. Result records that never l
 
 ## Seed data (reference)
 
-- Reference data (categories, specialisations, languages, cities, zones, localities) is seeded from `infra/seed/` by Java seed migrations listed in `src/main/resources/db/seed-migrations.csv`; see `infra/seed/README.md`. Their checksum is a hash of the seed files, so editing a seed file that is already on `main` fails Flyway validation: add a new seed migration instead. Use the next free version number across SQL and seed migrations.
+- Reference data (categories, specialisations, languages, cities, zones, localities) is seeded from `infra/seed/` by **repeatable** Java migrations listed in `src/main/resources/db/seed-migrations.csv`; see `infra/seed/README.md`. Editing a seed file is how reference data changes until Admin editing exists (Phase 3); Flyway reloads the migrations whose files changed on the next start. A reload upserts by stable key and retires (never deletes) rows that left the files. They are repeatable, not versioned, so they never collide with SQL migration versions.
+- Test the upgrade path, not just fresh databases: CI migrates an empty database, which cannot show what an edited seed file does to an existing one (see `SeedMigrationFlywayTest`).
 - **The build reads `../infra/seed`** (Maven copies it into the jar), so the build needs the repository root. Any future Docker build must use the repo root as its context, not `core/`.
 
 ## Authentication and configuration (identity)

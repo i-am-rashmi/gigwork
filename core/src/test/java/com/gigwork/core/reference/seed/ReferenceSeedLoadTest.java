@@ -107,13 +107,51 @@ class ReferenceSeedLoadTest {
 	}
 
 	@Test
-	void aReloadRepairsEditedRowsButKeepsTheirStatus() {
+	void aRowThatIsStillInTheFileIsLiveAfterAReload() {
 		jdbc.update("UPDATE reference.category SET name = 'Edited', status = 'RETIRED' WHERE slug = 'dj'");
 
 		ReferenceSeedLoader.loadReference(jdbc, new ClasspathSeedFiles());
 
 		assertThat(jdbc.queryForObject("SELECT name FROM reference.category WHERE slug = 'dj'", String.class)).isEqualTo("DJ");
+		assertThat(jdbc.queryForObject("SELECT status FROM reference.category WHERE slug = 'dj'", String.class)).isEqualTo("LIVE");
+	}
+
+	@Test
+	void rowsThatLeftTheFilesAreRetiredNotDeleted(@org.junit.jupiter.api.io.TempDir java.nio.file.Path seed) throws java.io.IOException {
+		for (String file : List.of("categories.csv", "specialisations.csv", "languages.csv")) {
+			java.nio.file.Files.copy(SeedFixtures.SEED_DIR.resolve(file), seed.resolve(file));
+		}
+		without(seed.resolve("categories.csv"), "dj,");
+		without(seed.resolve("specialisations.csv"), "dj,");
+		without(seed.resolve("languages.csv"), "tcy,");
+		int categories = count("category");
+		int specialisations = count("specialisation");
+
+		ReferenceSeedLoader.loadReference(jdbc, new DirectorySeedFiles(seed));
+
+		assertThat(count("category")).as("nothing is deleted").isEqualTo(categories);
+		assertThat(count("specialisation")).isEqualTo(specialisations);
 		assertThat(jdbc.queryForObject("SELECT status FROM reference.category WHERE slug = 'dj'", String.class)).isEqualTo("RETIRED");
+		assertThat(jdbc.queryForObject("""
+				SELECT count(*) FROM reference.specialisation s JOIN reference.category c ON c.id = s.category_id
+				WHERE c.slug = 'dj' AND s.status = 'LIVE'""", Integer.class)).as("specialisations of the retired category").isZero();
+		assertThat(jdbc.queryForObject("SELECT status FROM reference.language WHERE code = 'tcy'", String.class)).isEqualTo("RETIRED");
+		assertThat(jdbc.queryForObject("SELECT status FROM reference.category WHERE slug = 'photographer'", String.class)).isEqualTo("LIVE");
+	}
+
+	@Test
+	void anEmptyFileIsRefusedInsteadOfRetiringEverything(@org.junit.jupiter.api.io.TempDir java.nio.file.Path seed) throws java.io.IOException {
+		java.nio.file.Files.copy(SeedFixtures.SEED_DIR.resolve("specialisations.csv"), seed.resolve("specialisations.csv"));
+		java.nio.file.Files.copy(SeedFixtures.SEED_DIR.resolve("languages.csv"), seed.resolve("languages.csv"));
+		java.nio.file.Files.writeString(seed.resolve("categories.csv"), "slug,name,work_mode,language_relevant,display_order\n");
+
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> ReferenceSeedLoader.loadReference(jdbc, new DirectorySeedFiles(seed)))
+				.isInstanceOf(SeedDataException.class).hasMessageContaining("refusing to retire everything");
+	}
+
+	private static void without(java.nio.file.Path file, String linePrefix) throws java.io.IOException {
+		java.nio.file.Files.write(file, java.nio.file.Files.readAllLines(file).stream()
+				.filter(line -> !line.startsWith(linePrefix)).toList());
 	}
 
 }

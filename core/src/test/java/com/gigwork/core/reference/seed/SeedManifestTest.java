@@ -14,7 +14,7 @@ class SeedManifestTest {
 	}
 
 	@Test
-	void theRealManifestIsValidAndStartsAfterTheSqlMigrations() {
+	void theRealManifestIsValid() {
 		var entries = SeedManifest.read();
 
 		assertThat(entries).isNotEmpty();
@@ -25,7 +25,7 @@ class SeedManifestTest {
 
 	@Test
 	void parsesKindsAndFolders() {
-		var entries = SeedManifest.parse(b("version,description,kind,folder\n6,Ref,reference,.\n7,Pune,city,pune\n"));
+		var entries = SeedManifest.parse(b("description,kind,folder\nRef,reference,.\nPune,city,pune\n"));
 
 		assertThat(entries).extracting(SeedManifest.Entry::kind).containsExactly(SeedManifest.Kind.REFERENCE, SeedManifest.Kind.CITY);
 		assertThat(entries.get(1).folder()).isEqualTo("pune");
@@ -33,11 +33,11 @@ class SeedManifestTest {
 
 	@Test
 	void refusesARepeatedVersionAUnknownKindAndABadCityFolder() {
-		assertThatThrownBy(() -> SeedManifest.parse(b("version,description,kind,folder\n6,A,reference,.\n6,B,city,pune\n")))
+		assertThatThrownBy(() -> SeedManifest.parse(b("description,kind,folder\nA,reference,.\nA,city,pune\n")))
 				.isInstanceOf(SeedDataException.class).hasMessageContaining("repeated");
-		assertThatThrownBy(() -> SeedManifest.parse(b("version,description,kind,folder\n6,A,other,.\n")))
+		assertThatThrownBy(() -> SeedManifest.parse(b("description,kind,folder\nA,other,.\n")))
 				.isInstanceOf(SeedDataException.class).hasMessageContaining("unknown kind");
-		assertThatThrownBy(() -> SeedManifest.parse(b("version,description,kind,folder\n6,A,city,Pune City\n")))
+		assertThatThrownBy(() -> SeedManifest.parse(b("description,kind,folder\nA,city,Pune City\n")))
 				.isInstanceOf(SeedDataException.class).hasMessageContaining("slug");
 	}
 

@@ -9,8 +9,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The list of seed migrations ({@code db/seed-migrations.csv}): {@code version,description,kind,folder}. Adding a
- * city is one new line here (plus its folder under infra/seed and its row in cities.csv): no code changes.
+ * The list of seed migrations ({@code db/seed-migrations.csv}): {@code description,kind,folder}. Each line becomes
+ * one repeatable Flyway migration, so it has no version; the description must be unique. Adding a city is one new
+ * line here (plus its folder under infra/seed and its row in cities.csv): no code changes.
  */
 public final class SeedManifest {
 
@@ -23,7 +24,7 @@ public final class SeedManifest {
 		CITY
 	}
 
-	public record Entry(String version, String description, Kind kind, String folder) {
+	public record Entry(String description, Kind kind, String folder) {
 	}
 
 	private SeedManifest() {
@@ -43,9 +44,9 @@ public final class SeedManifest {
 
 	static List<Entry> parse(byte[] bytes) {
 		List<Entry> entries = new ArrayList<>();
-		Set<String> versions = new HashSet<>();
+		Set<String> descriptions = new HashSet<>();
 		for (Map<String, String> row : Csv.parse(bytes, RESOURCE)) {
-			String version = row.get("version").trim();
+			String description = row.get("description").trim();
 			Kind kind;
 			try {
 				kind = Kind.valueOf(row.get("kind").trim().toUpperCase());
@@ -53,14 +54,14 @@ public final class SeedManifest {
 			catch (IllegalArgumentException e) {
 				throw new SeedDataException(RESOURCE + ": unknown kind '" + row.get("kind") + "'", e);
 			}
-			if (!version.matches("[0-9]+(\\.[0-9]+)*") || !versions.add(version)) {
-				throw new SeedDataException(RESOURCE + ": version '" + version + "' is invalid or repeated");
+			if (description.isEmpty() || !descriptions.add(description)) {
+				throw new SeedDataException(RESOURCE + ": description '" + description + "' is empty or repeated (it identifies the migration)");
 			}
 			String folder = row.get("folder").trim();
 			if (kind == Kind.CITY && !folder.matches("[a-z0-9][a-z0-9-]*")) {
 				throw new SeedDataException(RESOURCE + ": a city folder must be its lowercase slug, got '" + folder + "'");
 			}
-			entries.add(new Entry(version, row.get("description").trim(), kind, folder));
+			entries.add(new Entry(description, kind, folder));
 		}
 		return List.copyOf(entries);
 	}

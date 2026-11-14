@@ -14,9 +14,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 
 /**
- * A Flyway migration that loads seed files. Its checksum is a hash of the bytes of the files it reads, so editing
- * a seed file after the migration ran makes Flyway's validation fail (a changed seed needs a new migration, like
- * any other schema or data change). The load itself is idempotent: every row is upserted by its stable key.
+ * A <em>repeatable</em> Flyway migration that loads seed files. Its checksum is a hash of the bytes of the files it
+ * reads, so Flyway runs it again, at the next start, whenever one of them has changed (and never otherwise). Until
+ * Admin editing exists (Phase 3), editing the seed files is how reference data changes. The load is idempotent:
+ * every row is upserted by its stable key, and rows that disappeared from the files are retired, never deleted.
  */
 public final class SeedMigration implements JavaMigration {
 
@@ -28,9 +29,10 @@ public final class SeedMigration implements JavaMigration {
 		this.files = files;
 	}
 
+	/** Null: repeatable migrations have no version (they run after all versioned ones, ordered by description). */
 	@Override
 	public MigrationVersion getVersion() {
-		return MigrationVersion.fromVersion(entry.version());
+		return null;
 	}
 
 	@Override

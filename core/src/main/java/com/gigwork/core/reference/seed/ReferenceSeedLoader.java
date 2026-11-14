@@ -15,9 +15,15 @@ import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Writes the seed files to the {@code reference} schema. Every statement is an upsert by the stable key, so running
- * a load again changes nothing. A conflict updates the descriptive columns but never {@code status}: retiring a row
- * is a decision made later, and a reload must not undo it.
+ * Writes the seed files to the {@code reference} schema. The files are the source of truth until Admin editing
+ * exists (Phase 3), and a load makes the database match them without ever deleting a row:
+ * <ul>
+ * <li>every row in a file is upserted by its stable key and is LIVE (a row that had been retired because it left
+ * the file, and came back, is LIVE again);</li>
+ * <li>rows of the same seed whose key is no longer in the file are set to RETIRED (a city's zones and localities;
+ * the categories, specialisations and languages for the reference seed).</li>
+ * </ul>
+ * Running a load again with unchanged files changes nothing.
  */
 final class ReferenceSeedLoader {
 
@@ -33,12 +39,16 @@ final class ReferenceSeedLoader {
 		List<Map<String, String>> specialisations = read(files, "specialisations.csv");
 		List<Map<String, String>> languages = read(files, "languages.csv");
 
+		requireRows(categories, "categories.csv");
+		requireRows(specialisations, "specialisations.csv");
+		requireRows(languages, "languages.csv");
 		Set<String> categorySlugs = new HashSet<>();
 		batch(jdbc, """
 				INSERT INTO reference.category (id, slug, name, work_mode, language_relevant, display_order)
 				VALUES (?, ?, ?, ?, ?, ?)
 				ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, work_mode = EXCLUDED.work_mode,
-				    language_relevant = EXCLUDED.language_relevant, display_order = EXCLUDED.display_order
+				    language_relevant = EXCLUDED.language_relevant, display_order = EXCLUDED.display_order,
+				    status = 'LIVE'
 				""", categories, (ps, row) -> {
 			String slug = required(row, "slug", "categories.csv");
 			if (!categorySlugs.add(slug)) {
@@ -56,7 +66,8 @@ final class ReferenceSeedLoader {
 		batch(jdbc, """
 				INSERT INTO reference.specialisation (id, category_id, slug, name, display_order)
 				VALUES (?, ?, ?, ?, ?)
-				ON CONFLICT (category_id, slug) DO UPDATE SET name = EXCLUDED.name, display_order = EXCLUDED.display_order
+				ON CONFLICT (category_id, slug) DO UPDATE SET name = EXCLUDED.name,
+				    display_order = EXCLUDED.display_order, status = 'LIVE'
 				""", specialisations, (ps, row) -> {
 			String category = required(row, "category_slug", "specialisations.csv");
 			String slug = required(row, "slug", "specialisations.csv");
@@ -76,7 +87,8 @@ final class ReferenceSeedLoader {
 		Set<String> codes = new HashSet<>();
 		batch(jdbc, """
 				INSERT INTO reference.language (code, name, display_order) VALUES (?, ?, ?)
-				ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, display_order = EXCLUDED.display_order
+				ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, display_order = EXCLUDED.display_order,
+				    status = 'LIVE'
 				""", languages, (ps, row) -> {
 			String code = required(row, "code", "languages.csv");
 			if (!codes.add(code)) {
@@ -86,8 +98,17 @@ final class ReferenceSeedLoader {
 			ps.setString(2, required(row, "name", "languages.csv"));
 			ps.setInt(3, integer(row, "display_order", "languages.csv"));
 		});
-		log.info("Reference seed: {} categories, {} specialisations, {} languages", categories.size(),
-				specialisations.size(), languages.size());
+
+		int retired = retire(jdbc, "UPDATE reference.category SET status = 'RETIRED' WHERE status = 'LIVE' AND slug <> ALL (?)",
+				categorySlugs);
+		retired += retire(jdbc, """
+				UPDATE reference.specialisation s SET status = 'RETIRED' FROM reference.category c
+				WHERE c.id = s.category_id AND s.status = 'LIVE' AND (c.slug || '/' || s.slug) <> ALL (?)
+				""", specialisationKeys);
+		retired += retire(jdbc, "UPDATE reference.language SET status = 'RETIRED' WHERE status = 'LIVE' AND code <> ALL (?)",
+				codes);
+		log.info("Reference seed: {} categories, {} specialisations, {} languages; {} rows retired", categories.size(),
+				specialisations.size(), languages.size(), retired);
 	}
 
 	// ---- one city -------------------------------------------------------------------------------------------
@@ -116,7 +137,7 @@ final class ReferenceSeedLoader {
 		UUID cityId = SeedIds.city(slug);
 		jdbc.update("""
 				INSERT INTO reference.city (id, slug, name, status) VALUES (?, ?, ?, ?)
-				ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+				ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, status = EXCLUDED.status
 				""", cityId, slug, city.name(), city.live() ? "LIVE" : "NOT_LIVE");
 
 		// PostgreSQL parses the GeoJSON; one row per feature: its name and its geometry.
@@ -137,24 +158,27 @@ final class ReferenceSeedLoader {
 			jdbc.update("""
 					INSERT INTO reference.zone (id, city_id, name, boundary)
 					VALUES (?, ?, ?, ST_Multi(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)))
-					ON CONFLICT (city_id, name) DO UPDATE SET boundary = EXCLUDED.boundary
+					ON CONFLICT (city_id, name) DO UPDATE SET boundary = EXCLUDED.boundary, status = 'LIVE'
 					""", SeedIds.zone(slug, name), cityId, name, zone.get("geometry"));
 		}
+		int retired = retire(jdbc, "UPDATE reference.zone SET status = 'RETIRED' WHERE city_id = ? AND status = 'LIVE' AND name <> ALL (?)",
+				zoneNames, cityId);
 
 		// The zone is computed by PostGIS: the one covering the point (lowest id on a shared border), else the nearest.
 		List<Map<String, String>> localities = read(files, slug + "/localities.csv");
+		requireRows(localities, slug + "/localities.csv");
 		Set<String> sources = new HashSet<>();
 		batch(jdbc, """
 				INSERT INTO reference.locality (id, source_id, city_id, zone_id, name, pin, lat, lng)
 				VALUES (?, ?, ?,
 				    COALESCE(
-				        (SELECT z.id FROM reference.zone z WHERE z.city_id = ?
+				        (SELECT z.id FROM reference.zone z WHERE z.city_id = ? AND z.status = 'LIVE'
 				            AND ST_Covers(z.boundary, ST_SetSRID(ST_MakePoint(?, ?), 4326)) ORDER BY z.id LIMIT 1),
-				        (SELECT z.id FROM reference.zone z WHERE z.city_id = ?
+				        (SELECT z.id FROM reference.zone z WHERE z.city_id = ? AND z.status = 'LIVE'
 				            ORDER BY z.boundary <-> ST_SetSRID(ST_MakePoint(?, ?), 4326), z.id LIMIT 1)),
 				    ?, ?, ?, ?)
 				ON CONFLICT (city_id, source_id) DO UPDATE SET zone_id = EXCLUDED.zone_id, name = EXCLUDED.name,
-				    pin = EXCLUDED.pin, lat = EXCLUDED.lat, lng = EXCLUDED.lng
+				    pin = EXCLUDED.pin, lat = EXCLUDED.lat, lng = EXCLUDED.lng, status = 'LIVE'
 				""", localities, (ps, row) -> {
 			String file = slug + "/localities.csv";
 			String source = required(row, "source_id", file);
@@ -178,10 +202,34 @@ final class ReferenceSeedLoader {
 			ps.setDouble(12, lat);
 			ps.setDouble(13, lng);
 		});
-		log.info("Reference seed for {}: {} zones, {} localities", slug, zones.size(), localities.size());
+		retired += retire(jdbc, "UPDATE reference.locality SET status = 'RETIRED' WHERE city_id = ? AND status = 'LIVE' AND source_id <> ALL (?)",
+				sources, cityId);
+		log.info("Reference seed for {}: {} zones, {} localities; {} rows retired", slug, zones.size(),
+				localities.size(), retired);
 	}
 
 	// ---- helpers --------------------------------------------------------------------------------------------
+
+	/**
+	 * Runs an UPDATE whose last parameter is the array of keys still in the file (and whose earlier ones are
+	 * {@code leading}); returns the rows changed.
+	 */
+	private static int retire(JdbcTemplate jdbc, String sql, Set<String> keysInFile, Object... leading) {
+		String[] keys = keysInFile.toArray(String[]::new);
+		return jdbc.update(sql, ps -> {
+			for (int i = 0; i < leading.length; i++) {
+				ps.setObject(i + 1, leading[i]);
+			}
+			ps.setArray(leading.length + 1, ps.getConnection().createArrayOf("text", keys));
+		});
+	}
+
+	/** An empty file would retire everything, which is never what an edit means. */
+	private static void requireRows(List<Map<String, String>> rows, String file) {
+		if (rows.isEmpty()) {
+			throw new SeedDataException(file + " has no rows; refusing to retire everything");
+		}
+	}
 
 	@FunctionalInterface
 	private interface RowBinder {
