@@ -182,6 +182,36 @@
 	</dependencyManagement>
 
 	<build>
+		<!-- The seed data lives in ../infra/seed (the single source, see infra/seed/README.md) and is packaged
+		     into the jar under seed/ for the reference module's seed migrations. The first two entries repeat
+		     Spring Boot's defaults, which declaring resources here would otherwise replace. -->
+		<resources>
+			<resource>
+				<directory>${project.basedir}/src/main/resources</directory>
+				<filtering>true</filtering>
+				<includes>
+					<include>**/application*.yml</include>
+					<include>**/application*.yaml</include>
+					<include>**/application*.properties</include>
+				</includes>
+			</resource>
+			<resource>
+				<directory>${project.basedir}/src/main/resources</directory>
+				<excludes>
+					<exclude>**/application*.yml</exclude>
+					<exclude>**/application*.yaml</exclude>
+					<exclude>**/application*.properties</exclude>
+				</excludes>
+			</resource>
+			<resource>
+				<directory>${project.basedir}/../infra/seed</directory>
+				<targetPath>seed</targetPath>
+				<includes>
+					<include>**/*.csv</include>
+					<include>**/*.geojson</include>
+				</includes>
+			</resource>
+		</resources>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
