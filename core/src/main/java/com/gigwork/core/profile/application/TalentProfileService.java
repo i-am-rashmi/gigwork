@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.gigwork.core.identity.AccountNames;
+import com.gigwork.core.profile.TalentProfileSummary;
+import com.gigwork.core.profile.TalentProfiles;
 import com.gigwork.core.profile.config.ProfileProperties;
 import com.gigwork.core.profile.domain.InvalidCategoriesException;
 import com.gigwork.core.profile.domain.InvalidLanguagesException;
@@ -47,7 +49,7 @@ import com.gigwork.core.reference.ZoneInfo;
  * serialised and the lists in the database are always exactly one request's list.
  */
 @Service
-public class TalentProfileService {
+public class TalentProfileService implements TalentProfiles {
 
 	static final int MEMBER_COUNT_MIN = 2;
 	static final int MEMBER_COUNT_MAX = 50;
@@ -133,6 +135,11 @@ public class TalentProfileService {
 			Optional<String> firstName = caller.isPresent() ? names.firstName(accountId) : Optional.empty();
 			return new PublicProfile(view(profile), firstName, caller.isPresent());
 		});
+	}
+
+	@Override
+	public Optional<TalentProfileSummary> summary(UUID accountId) {
+		return store.find(accountId).map(p -> new TalentProfileSummary(p.accountId(), p.status(), p.cityId()));
 	}
 
 	// ---- work section: validation against the rules and Reference Data ----------------------------------------
