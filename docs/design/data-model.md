@@ -77,6 +77,8 @@ Busy blocks and bookings are separate because they follow different rules: booki
 
 **Guarantees:** unique names and slugs (a specialisation's slug is unique within its category); a locality's source ID is unique within its city, while locality names are not unique; every locality has a zone (the one containing its centre point, else the nearest); a city's zones don't overlap; nothing referenced is deleted, only retired.
 
+**Source of truth:** until Admin editing exists (Phase 3, FR-33/FR-34), reference data is changed by editing the seed files, which reload on the next start (rows that leave the files are retired, never deleted). After that, the database is the source of truth and the files are only the initial data.
+
 **Volume:** a few thousand rows.
 
 ## 5. Gigs
