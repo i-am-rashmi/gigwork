@@ -1,5 +1,7 @@
 -- Availability module (FR-7, FR-29, NFR-14, ADR-0002). Accounts and gigs are referenced by ID only.
--- All ranges are half-open [start, end): back-to-back periods (10-14 and 14-18) do not overlap.
+-- All ranges are half-open [start, end): back-to-back periods (10-14 and 14-18) do not overlap. Both bounds are
+-- real instants: not unbounded, and not the timestamps 'infinity' / '-infinity' (lower_inf and upper_inf only see
+-- unbounded ranges).
 
 -- A Talent's own unavailable times: private hints, used for warnings and matching, never blocking a hire.
 -- Busy blocks may overlap each other.
@@ -15,7 +17,8 @@ CREATE TABLE availability.busy_block (
     created_at  timestamptz NOT NULL,
     CONSTRAINT busy_block_period_valid CHECK (
         NOT isempty(period) AND lower_inc(period) AND NOT upper_inc(period)
-        AND NOT lower_inf(period) AND NOT upper_inf(period)),
+        AND NOT lower_inf(period) AND NOT upper_inf(period)
+        AND isfinite(lower(period)) AND isfinite(upper(period))),
     CONSTRAINT busy_block_all_day_dates CHECK (
         (all_day AND start_date IS NOT NULL AND end_date IS NOT NULL AND end_date >= start_date)
         OR (NOT all_day AND start_date IS NULL AND end_date IS NULL))
@@ -34,7 +37,8 @@ CREATE TABLE availability.booking (
     cancelled_at  timestamptz,
     CONSTRAINT booking_period_valid CHECK (
         NOT isempty(period) AND lower_inc(period) AND NOT upper_inc(period)
-        AND NOT lower_inf(period) AND NOT upper_inf(period)),
+        AND NOT lower_inf(period) AND NOT upper_inf(period)
+        AND isfinite(lower(period)) AND isfinite(upper(period))),
     CONSTRAINT booking_cancelled_at_matches_status CHECK ((status = 'CANCELLED') = (cancelled_at IS NOT NULL)),
     -- no two ACTIVE bookings of one Talent overlap: the database decides, never check-then-insert
     CONSTRAINT booking_no_overlap EXCLUDE USING gist (account_id WITH =, period WITH &&) WHERE (status = 'ACTIVE')
