@@ -85,8 +85,10 @@ Busy blocks and bookings are separate because they follow different rules: booki
 
 | Entity | Key fields |
 | --- | --- |
-| Gig | ID, Poster account ID, category ID, specialisation ID (optional), language code (optional), title, description, start, end, work mode (on-site / remote), location point, city ID, zone ID, locality name, TA offered, budget minimum, budget maximum, status, published at, closed at, close reason, outcome, gig group ID |
+| Gig | ID, Poster account ID, category ID, specialisation ID (optional), language code (optional), title, description, start, end, work mode (on-site / remote), location point, city ID, zone ID, locality name, locality ID (optional), TA offered, budget minimum, budget maximum, status, published at, updated at, closed at, close reason, outcome, gig group ID |
 | Gig group | ID, Poster account ID, source (form / AI), AI drafting session ID, created at |
+
+The gig group, and the gig's group ID, are added together with AI drafting (slice 9); until then a gig stands alone.
 
 **Lifecycle:** OPEN → FILLED (confirmed hire) or CANCELLED (by the Poster) or EXPIRED (start passed); FILLED → OPEN (hire cancelled before the start) or CANCELLED (Poster cancels; the hire is cancelled too). A filled gig can't be edited.
 
