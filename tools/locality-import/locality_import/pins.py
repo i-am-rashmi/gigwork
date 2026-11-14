@@ -123,7 +123,7 @@ def in_region(o: dict, bbox: tuple[float, float, float, float], margin_deg: floa
     return w - margin_deg <= o["lon"] <= e + margin_deg and s - margin_deg <= o["lat"] <= n + margin_deg
 
 
-def load_offices(csv_path: Path, bbox: tuple[float, float, float, float], margin_deg: float, outlier_m: float = 4_000, shared_point_pins: int = 3):
+def load_offices(csv_path: Path, bbox: tuple[float, float, float, float], margin_deg: float, outlier_m: float = 12_000, shared_point_pins: int = 3):
     """Read the India Post directory and return (candidate offices, counts, info).
 
     Order: valid coordinates and PIN -> drop offices stacked on one point -> drop per-PIN location outliers (judged against all of the PIN's

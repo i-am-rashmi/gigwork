@@ -99,7 +99,7 @@ def test_outlier_is_judged_against_all_offices_of_the_pin_even_outside_the_regio
     f.write_text(HEADER + "".join(
         f'c,r,d,"{n}",560004,BO,Delivery,D,KARNATAKA,{la},{lo}\n'
         for n, la, lo in [("a", 12.95, 77.57), ("b", 12.96, 77.58), ("c", 12.95, 77.58), ("wrong", 12.97, 77.65)]), encoding="utf-8")
-    offices, c, info = pins.load_offices(f, (77.4, 12.8, 77.8, 13.2), 0.05)
+    offices, c, info = pins.load_offices(f, (77.4, 12.8, 77.8, 13.2), 0.05, outlier_m=4_000)
     assert sorted(o["office"] for o in offices) == ["a", "b", "c"] and c.outliers == 1
     assert [o["office"] for o in info["outliers"]] == ["wrong"]
 
@@ -117,3 +117,10 @@ def test_two_pins_at_one_point_and_many_offices_of_one_pin_are_kept():
     a = [OF("560032", "R T Nagar", 13.0216, 77.5928), OF("560006", "J C Nagar", 13.0216, 77.5928)]
     b = [OF("560001", "x", 12.9, 77.5), OF("560001", "y", 12.9, 77.5), OF("560001", "z", 12.9, 77.5)]
     assert pins.drop_shared_points(a + b)[1] == []
+
+
+def test_default_outlier_distance_is_12_km():
+    near = [OF("560064", "a", 12.95, 77.57), OF("560064", "b", 12.951, 77.571), OF("560064", "c", 12.952, 77.572),
+            OF("560064", "wide PIN, 8 km out", 12.95, 77.65)]
+    assert pins.load_offices.__defaults__[0] == 12_000
+    assert pins.find_outliers(near, 12_000)[1] == [] and len(pins.find_outliers(near, 4_000)[1]) == 1

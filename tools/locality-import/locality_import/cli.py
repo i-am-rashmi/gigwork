@@ -35,7 +35,7 @@ def parse_args(argv=None):
                         "Default if neither is set: the most common 3-digit prefix among offices in the region")
     p.add_argument("--parent-m", type=float, default=2000, help="radius to find a parent area for generic names like '4th Block'")
     p.add_argument("--config-dir", type=Path, default=None, help="default: tools/locality-import/config/<city>")
-    p.add_argument("--outlier-m", type=float, default=4000,
+    p.add_argument("--outlier-m", type=float, default=12000,
                    help="drop post offices farther than this from the median location of their PIN's offices")
     p.add_argument("--shared-point-pins", type=int, default=3,
                    help="drop post offices stacked on one exact point with this many different PINs (geocoder default)")
