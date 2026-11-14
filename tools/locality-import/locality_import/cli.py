@@ -97,7 +97,7 @@ def run(args, fetcher=places.fetch_overpass) -> dict:
     rows = []
     for a in assigned:
         lon, lat = xy_to_lonlat(a["x"], a["y"], crs)
-        rows.append({**a, "lat": round(lat, 6), "lng": round(lon, 6)})
+        rows.append({**a, "lat": round(lat, 6), "lng": round(lon, 6), "source_id": output.source_id(a["osm_ids"])})
     rows, ov_applied = ovr.apply_overrides(rows, ovr.load_overrides(cfg_dir / "overrides.csv"))
 
     # 5. Committed outputs, then review files.
@@ -130,7 +130,7 @@ def main(argv=None) -> int:
     args = parse_args(argv)
     try:
         ctx = run(args)
-    except (zones.ZoneError, ovr.OverrideError) as exc:
+    except (zones.ZoneError, ovr.OverrideError, output.SeedError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     print(f"{ctx['n_final']} localities -> {ctx['seed_dir']}")

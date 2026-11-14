@@ -57,7 +57,7 @@ Options (defaults in brackets): `--buffer-m` [500] keep places this far outside 
 Committed, in `infra/seed/<city>/`:
 
 - `zones.geojson`: simplified zones, properties: `name` only.
-- `localities.csv`: `name,pin,lat,lng`, lat/lng with 6 decimals, sorted by name. `pin` may be empty.
+- `localities.csv`: `source_id,name,pin,lat,lng`; `source_id` is the stable key (smallest OSM id among the merged places, e.g. `node/123`; unique, the run fails otherwise); lat/lng with 6 decimals, sorted by name. `pin` may be empty.
 
 Review only, in `tools/locality-import/output/<city>/`: `report.md`, `map.html` and `prefixed.csv`.
 
