@@ -23,3 +23,10 @@ bin/
 # Claude Code (personal settings only; shared settings.json IS committed)
 .claude/settings.local.json
 CLAUDE.local.md
+
+# locality-import tool (raw inputs and review output are not committed)
+tools/locality-import/input/
+tools/locality-import/output/
+tools/locality-import/.venv/
+__pycache__/
+.pytest_cache/
