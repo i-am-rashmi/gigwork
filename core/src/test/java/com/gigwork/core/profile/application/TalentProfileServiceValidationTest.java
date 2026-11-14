@@ -30,6 +30,7 @@ import com.gigwork.core.profile.persistence.ProfileStore;
 import com.gigwork.core.reference.AreaResolution;
 import com.gigwork.core.reference.LanguageInfo;
 import com.gigwork.core.reference.LocalityInfo;
+import com.gigwork.core.reference.LocationResolver;
 import com.gigwork.core.reference.ReferenceData;
 import com.gigwork.core.reference.SpecialisationInfo;
 
@@ -61,10 +62,10 @@ class TalentProfileServiceValidationTest {
 		when(reference.specialisation(LIVE_SPEC)).thenReturn(Optional.of(new SpecialisationInfo(LIVE_SPEC, LIVE, "wedding", "Wedding", true, 1)));
 		when(reference.specialisation(RETIRED_SPEC)).thenReturn(Optional.of(new SpecialisationInfo(RETIRED_SPEC, LIVE, "old", "Old", false, 2)));
 		when(reference.languages()).thenReturn(List.of(new LanguageInfo("kn", "Kannada", 1)));
-		ProfileProperties properties = new ProfileProperties(5, 10, 10, new ProfileProperties.Location(50, 2000),
+		ProfileProperties properties = new ProfileProperties(5, 10, 10,
 				new ProfileProperties.Portfolio(List.of("bit.ly")));
 		when(names.firstName(ACCOUNT)).thenReturn(Optional.of("Asha"));
-		service = new TalentProfileService(store, reference, names, properties, transaction,
+		service = new TalentProfileService(store, reference, names, properties, new LocationResolver(reference, 50, 2000), transaction,
 				Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
 	}
 
@@ -114,8 +115,8 @@ class TalentProfileServiceValidationTest {
 
 	@Test
 	void theLimitsAreTheConfiguredOnes() {
-		ProfileProperties small = new ProfileProperties(2, 1, 1, new ProfileProperties.Location(50, 2000), new ProfileProperties.Portfolio(List.of()));
-		TalentProfileService strict = new TalentProfileService(store, reference, names, small, transaction,
+		ProfileProperties small = new ProfileProperties(2, 1, 1, new ProfileProperties.Portfolio(List.of()));
+		TalentProfileService strict = new TalentProfileService(store, reference, names, small, new LocationResolver(reference, 50, 2000), transaction,
 				Clock.systemUTC());
 		UUID third = UUID.randomUUID();
 		when(reference.isLiveCategory(third)).thenReturn(true);

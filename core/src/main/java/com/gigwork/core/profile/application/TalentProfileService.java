@@ -59,13 +59,12 @@ public class TalentProfileService implements TalentProfiles {
 	private final Clock clock;
 
 	TalentProfileService(ProfileStore store, ReferenceData reference, AccountNames names, ProfileProperties properties,
-			TransactionTemplate transaction, Clock clock) {
+			LocationResolver locations, TransactionTemplate transaction, Clock clock) {
 		this.store = store;
 		this.reference = reference;
 		this.names = names;
 		this.properties = properties;
-		this.locations = new LocationResolver(reference, properties.location().maxDistanceFromZoneKm(),
-				properties.location().labelRadiusMeters());
+		this.locations = locations;
 		this.transaction = transaction;
 		this.clock = clock;
 	}

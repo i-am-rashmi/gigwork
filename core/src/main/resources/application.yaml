@@ -41,7 +41,7 @@ gigwork:
 
   reference:
     location:
-      max-distance-from-zone-km: 50   # a gig's map point farther than this from the nearest live zone is rejected
+      max-distance-from-zone-km: 50   # FR-5: a map point (of a profile or a gig) farther than this from the nearest live zone is rejected
       label-radius-meters: 2000       # a map point is labelled with the nearest locality within this distance
 
   profile:
@@ -49,9 +49,6 @@ gigwork:
     max-categories: 5
     max-specialisations: 10
     max-links: 10
-    location:
-      max-distance-from-zone-km: 50   # a map point farther than this from the nearest live zone is rejected (FR-5)
-      label-radius-meters: 2000       # a map point is labelled with the nearest locality within this distance
     portfolio:
       blocked-hosts: [bit.ly, tinyurl.com, t.co, goo.gl, rb.gy, cutt.ly, is.gd]   # URL shorteners (FR-6)
 

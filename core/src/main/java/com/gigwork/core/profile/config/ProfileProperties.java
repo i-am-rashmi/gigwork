@@ -14,14 +14,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties("gigwork.profile")
 public record ProfileProperties(@DefaultValue("5") int maxCategories, @DefaultValue("10") int maxSpecialisations,
-		@DefaultValue("10") int maxLinks, @DefaultValue Location location, @DefaultValue Portfolio portfolio) {
-
-	/**
-	 * @param maxDistanceFromZoneKm FR-5: a map point farther than this from the nearest live zone is rejected
-	 * @param labelRadiusMeters a map point is labelled with the nearest locality within this distance, else the zone
-	 */
-	public record Location(@DefaultValue("50") double maxDistanceFromZoneKm, @DefaultValue("2000") double labelRadiusMeters) {
-	}
+		@DefaultValue("10") int maxLinks, @DefaultValue Portfolio portfolio) {
 
 	/** @param blockedHosts URL shorteners (and their subdomains) that are not accepted as portfolio links */
 	public record Portfolio(@DefaultValue({ "bit.ly", "tinyurl.com", "t.co", "goo.gl", "rb.gy", "cutt.ly",
