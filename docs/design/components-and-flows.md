@@ -27,7 +27,7 @@ All components except Matching & Notifications are modules inside the core servi
 | 7 | Hiring | Applications, shortlists, consent records, contact access log, hires | FR-23 to FR-28, FR-25a | 1 |
 | 8 | Matching & Notifications (separate service) | Its own copy of Talent data, in-app inbox, notification records, delivery | FR-20 to FR-22, FR-24, FR-30, FR-32 | 1 (inbox, end of phase), 2 (fan-out) |
 | 9 | Discovery | Browse and search | FR-9 to FR-12 | 1 (plain list), 3 (full) |
-| 10 | Platform | Feature flags, audit log, scheduled actions, outbox relay, rate limits | FR-36 and many NFRs | 1 |
+| 10 | Platform | Feature flags, audit log, outbox relay, rate limits, the scheduling configuration and the job lock (ShedLock) | FR-36 and many NFRs | 1 |
 | 11 | Moderation | Reports, suspensions | FR-35, NFR-41 | 3 |
 
 **Gig lifecycle (owned by Gigs):** OPEN → FILLED (on a confirmed hire), CANCELLED (by the Poster) or EXPIRED (start time passed). There is no DRAFT status: drafts are not stored on the server (FR-17; saved drafts are future scope F-7).
@@ -77,7 +77,7 @@ Either side starts a hire; the other must confirm within 24 hours or it lapses. 
 
 ### 8. Things that happen by themselves
 
-Scheduled actions stored in the database, checked every minute with row locking, each re-checking its condition before acting: gig expiry, pending-hire lapse (24 h), shortlist and pre-gig reminders, application summaries, and the daily data cleanup. The timer decides when; the owning component decides what.
+Periodic jobs, each owned by the module whose data it changes (ADR-0010). A job is a conditional SQL statement that sweeps the rows that are due, so it is safe to run twice at the same time and correctness never depends on a timer or a lock; there are no per-item timers and no table of scheduled actions. The jobs are: gig expiry (Gigs, every minute), pending-hire lapse after 24 h (Hiring, every minute), deletion of expired OTP challenges and old sessions, of AI drafting sessions after 14 days, and of accounts after the deletion period (each daily). Platform owns the scheduling configuration, the switch that turns jobs off, and ShedLock, which makes one core instance run a job per tick. Later jobs, such as reminders and application summaries, follow the same rules. A request never relies on a job having run: applying or editing a gig checks the start time itself.
 
 ### 9. Publishing a gig notifies matching Talent (Phase 2)
 
