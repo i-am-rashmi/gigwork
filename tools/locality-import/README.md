@@ -35,15 +35,22 @@ python -m locality_import --city bengaluru \
   [--refresh-osm]
 ```
 
-Options (defaults in brackets): `--buffer-m` [500] keep places this far outside the zones; `--max-pin-m` [3000] farthest post office a PIN may come from; `--dedupe-m` [1000] merge same-named places this close; `--simplify-m` [10] zone simplification tolerance; `--zone-name-field` [`NewCorp`]; `--expected-zones` [`Central,East,North,South,West`] the exact zone names the file must contain (the run stops if they differ; an empty value disables the check).
+Options (defaults in brackets): `--buffer-m` [500] keep places this far outside the zones; `--max-pin-m` [3000] farthest post office a PIN may come from; `--dedupe-m` [1000] merge same-named places this close; `--parent-m` [2000] radius for finding a parent area for generic names; `--pin-prefixes` overrides the city's configured PIN prefixes; `--simplify-m` [10] zone simplification tolerance; `--zone-name-field` [`NewCorp`]; `--expected-zones` [`Central,East,North,South,West`] the exact zone names the file must contain (the run stops if they differ; an empty value disables the check).
 
 ## What it does
 
 1. **Zones**: one polygon per zone, clean name, EPSG:4326, invalid geometry repaired. Simplified in metres (the city's UTM zone) with a topology-preserving method, so shared edges stay shared and simplification creates no gaps or overlaps. Overlap (m², pairwise) and gaps (holes of the union of all zones, m² each) are reported before and after.
 2. **Places**: OSM `place=suburb|neighbourhood|quarter|village|town|hamlet` within the zones' bounding box, kept only if inside the union of zones plus the buffer.
-3. **Clean**: `name:en` over `name`, whitespace normalised, unnamed dropped, same name within the dedupe distance merged to the group's centroid. Every merge group is listed in the report (a chain A-B-C can merge even if A and C are farther apart than the threshold; the report shows the largest pairwise distance).
-4. **PIN**: nearest valid post office within the max distance, measured in metres in the projected CRS. No match: empty PIN, listed in the report.
+3. **Clean**: `name:en` over `name`, whitespace normalised, unnamed dropped. Generic names that mean nothing alone (`4th Block`, `Sector 2`, `Further Extension`, `3rd Cross`...) get the nearest suburb/neighbourhood within the parent radius as a prefix (`HSR Layout Sector 2`); with no parent in range the row is dropped. The nearest parent is a heuristic, so check the examples in the report. Then same name within the dedupe distance merged to the group's centroid. Every merge group is listed in the report (a chain A-B-C can merge even if A and C are farther apart than the threshold; the report shows the largest pairwise distance).
+4. **PIN**: nearest valid post office within the max distance, measured in metres in the projected CRS, among offices whose PIN starts with one of the city's prefixes (India Post has offices in other districts whose coordinates fall inside the city). No match: empty PIN, listed in the report. Then manual overrides are applied and listed.
 5. **Output**: deterministic (same inputs give byte-identical files).
+
+## Per-city configuration (committed): `config/<city>/`
+
+| File | Content |
+|---|---|
+| `settings.json` | `{"pin_prefixes": ["560", "562"]}`: PIN prefixes that belong to the city. Without it the most common 3-digit prefix in the region is used (and the report says so). |
+| `pin-overrides.csv` | `name,pin,reason`: manual PIN fixes for localities with no automatic PIN or a wrong one. Applied after automatic assignment, matched on exact name (case-insensitive) for every row with that name, and listed in the report (unmatched names are flagged). |
 
 ## Output
 
@@ -64,13 +71,14 @@ Review only, in `tools/locality-import/output/<city>/`: `report.md` and `map.htm
 ## Adding a new city
 
 1. Put the city's zone boundaries (KML/GeoJSON) in `input/`. The India Post CSV is national, so it is reused as is.
-2. Run with a new slug, and pass the zone names if they differ from the default:
+2. Create `config/pune/settings.json` with the city's PIN prefixes (and optionally an empty `pin-overrides.csv` with the header `name,pin,reason`).
+3. Run with a new slug, and pass the zone names if they differ from the default:
    ```bash
    python -m locality_import --city pune --zones input/pune_zones.geojson \
      --pins input/all_india_pincode_directory.csv \
      --zone-name-field name --expected-zones "Zone A,Zone B,Zone C"
    ```
-3. Review as above, then commit `infra/seed/pune/`.
+4. Review as above, then commit `config/pune/` and `infra/seed/pune/`.
 
 ## Data sources and attribution
 
