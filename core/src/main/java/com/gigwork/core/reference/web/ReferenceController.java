@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,10 +25,12 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 
-/** The reference lists everyone needs before signing up (FR-4, FR-5, FR-34). Public; the /v1 prefix is added by the platform. */
+/**
+ * The reference lists everyone needs before signing up (FR-4, FR-5, FR-34). Public; the /v1 prefix is added by the
+ * platform.
+ */
 @RestController
 @RequestMapping
-@Validated
 @Tag(name = "Reference data", description = "Categories, languages, cities, zones and localities (live ones only)")
 @SecurityRequirements // public: no bearer token needed
 class ReferenceController {
