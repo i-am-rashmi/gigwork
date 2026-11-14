@@ -1,0 +1,22 @@
+slug,name,work_mode,language_relevant,display_order
+photographer,Photographer,ON_SITE,false,1
+videographer,Videographer,ON_SITE,false,2
+makeup-artist,Makeup artist,ON_SITE,false,3
+hair-stylist,Hair stylist,ON_SITE,false,4
+mehendi-artist,Mehendi artist,ON_SITE,false,5
+decorator,Décorator,ON_SITE,false,6
+dj,DJ,ON_SITE,false,7
+anchor,Anchor / Emcee,ON_SITE,true,8
+band,Band,ON_SITE,true,9
+singer,Singer,ON_SITE,true,10
+instrumentalist,Instrumentalist,ON_SITE,false,11
+dancer,Dancer / dance troupe,ON_SITE,false,12
+choreographer,Choreographer,ON_SITE,false,13
+comedian,Stand-up comedian,ON_SITE,true,14
+magician,Magician,ON_SITE,true,15
+event-curator,Event curator,ON_SITE,false,16
+painter-caricature,Painter & caricature artist,BOTH,false,17
+social-media-manager,Social media manager,BOTH,true,18
+content-creator,Content creator,BOTH,true,19
+video-editor,Video editor,REMOTE,false,20
+content-writer,Content writer,REMOTE,true,21
