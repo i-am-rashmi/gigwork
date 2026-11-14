@@ -142,6 +142,39 @@ class ReferenceDataIntegrationTest {
 	}
 
 	@Test
+	void distanceToTheNearestZoneIsZeroInsideAndInMetresOutside() {
+		assertThat(reference.resolveArea(12.9756, 77.6097).distanceToZoneMeters()).isZero();
+
+		double north = reference.resolveArea(13.35, 77.57).distanceToZoneMeters(); // about 23 km above the city's edge
+		assertThat(north).isBetween(20_000.0, 27_000.0);
+		assertThat(reference.resolveArea(28.61, 77.21).distanceToZoneMeters()).isGreaterThan(1_500_000); // Delhi
+	}
+
+	@Test
+	void lookupsByIdForCitiesZonesAndLocalities() {
+		CityInfo city = reference.liveCities().get(0);
+		ZoneInfo zone = reference.zones(city.id()).get(0);
+		LocalityInfo locality = reference.searchLocalities("indiranagar", 1).get(0);
+
+		assertThat(reference.city(city.id())).contains(city);
+		assertThat(reference.zone(zone.id())).contains(zone);
+		assertThat(reference.locality(locality.id())).contains(locality);
+		assertThat(reference.city(UUID.randomUUID())).isEmpty();
+		assertThat(reference.zone(UUID.randomUUID())).isEmpty();
+		assertThat(reference.locality(UUID.randomUUID())).isEmpty();
+	}
+
+	@Test
+	void nearestLocalityIsFoundWithinTheDistanceOnly() {
+		LocalityInfo indiranagar = reference.searchLocalities("indiranagar", 1).get(0);
+
+		assertThat(reference.nearestLocality(indiranagar.lat(), indiranagar.lng(), 50)).hasValueSatisfying(l -> assertThat(l.id()).isEqualTo(indiranagar.id()));
+		assertThat(reference.nearestLocality(indiranagar.lat() + 0.003, indiranagar.lng(), 2_000)).isPresent();
+		assertThat(reference.nearestLocality(28.61, 77.21, 2_000)).isEmpty(); // Delhi: nothing within 2 km
+		assertThatThrownBy(() -> reference.nearestLocality(95, 0, 2_000)).isInstanceOf(InvalidCoordinatesException.class);
+	}
+
+	@Test
 	void badCoordinatesAreRefused() {
 		assertThatThrownBy(() -> reference.resolveArea(95, 77)).isInstanceOf(InvalidCoordinatesException.class);
 	}

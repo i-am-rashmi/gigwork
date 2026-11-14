@@ -97,6 +97,29 @@ class ReferenceDataService implements ReferenceData {
 	}
 
 	@Override
+	public Optional<CityInfo> city(UUID id) {
+		return Optional.ofNullable(snapshot.get().city(id));
+	}
+
+	@Override
+	public Optional<ZoneInfo> zone(UUID id) {
+		return Optional.ofNullable(snapshot.get().zone(id));
+	}
+
+	@Override
+	public Optional<LocalityInfo> locality(UUID id) {
+		return Optional.ofNullable(snapshot.get().locality(id));
+	}
+
+	@Override
+	public Optional<LocalityInfo> nearestLocality(double lat, double lng, double maxMeters) {
+		if (!(lat >= -90 && lat <= 90) || !(lng >= -180 && lng <= 180)) {
+			throw new InvalidCoordinatesException(lat, lng);
+		}
+		return Optional.ofNullable(snapshot.get().nearestLocality(lat, lng, maxMeters));
+	}
+
+	@Override
 	public AreaResolution resolveArea(double lat, double lng) {
 		if (!(lat >= -90 && lat <= 90) || !(lng >= -180 && lng <= 180)) {
 			throw new InvalidCoordinatesException(lat, lng);

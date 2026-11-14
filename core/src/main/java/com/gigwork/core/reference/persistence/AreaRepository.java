@@ -32,17 +32,21 @@ public class AreaRepository {
 				+ " AND ST_Covers(z.boundary, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)) ORDER BY z.id LIMIT 1")
 				.param("lng", lng).param("lat", lat)
 				.query((rs, n) -> new AreaResolution(rs.getObject("city_id", UUID.class),
-						rs.getObject("zone_id", UUID.class), true))
+						rs.getObject("zone_id", UUID.class), true, 0))
 				.optional();
 	}
 
-	/** The nearest zone (KNN on the GiST index; distance in degrees, which is fine for ranking zones of one region). */
+	/**
+	 * The nearest zone (KNN on the GiST index; ranked by distance in degrees, which is fine for ordering the zones of
+	 * one region) with its distance in metres.
+	 */
 	public Optional<AreaResolution> findNearest(double lat, double lng) {
-		return jdbc.sql("SELECT z.city_id, z.id AS zone_id " + LIVE_ZONES
+		return jdbc.sql("SELECT z.city_id, z.id AS zone_id, ST_Distance(z.boundary::geography, "
+				+ "ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) AS meters " + LIVE_ZONES
 				+ " ORDER BY z.boundary <-> ST_SetSRID(ST_MakePoint(:lng, :lat), 4326), z.id LIMIT 1")
 				.param("lng", lng).param("lat", lat)
 				.query((rs, n) -> new AreaResolution(rs.getObject("city_id", UUID.class),
-						rs.getObject("zone_id", UUID.class), false))
+						rs.getObject("zone_id", UUID.class), false, rs.getDouble("meters")))
 				.optional();
 	}
 
