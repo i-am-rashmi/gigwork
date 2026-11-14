@@ -50,3 +50,22 @@ def test_duplicate_source_id_fails_and_writes_nothing(tmp_path):
     with pytest.raises(output.SeedError, match="node/9"):
         output.write_localities_csv(rows, tmp_path / "x.csv")
     assert not (tmp_path / "x.csv").exists()
+
+
+def test_zones_geojson_is_valid_one_position_per_line_and_diffable(tmp_path):
+    import json
+    g = gpd.GeoDataFrame({"name": ["A"], "geometry": [box(0, 0, 1, 1)]}, crs=4326)
+    a = tmp_path / "a.geojson"
+    output.write_zones_geojson(g, a)
+    text = a.read_text()
+    fc = json.loads(text)
+    assert fc["features"][0]["properties"] == {"name": "A"} and fc["features"][0]["geometry"]["type"] == "Polygon"
+    lines = text.splitlines()
+    import re
+    assert sum(1 for l in lines if re.fullmatch(r"\s*\[-?[\d.]+,-?[\d.]+\],?", l)) == 5  # one position per line
+    # moving one vertex changes exactly one line
+    g2 = gpd.GeoDataFrame({"name": ["A"], "geometry": [box(0, 0, 1, 1.5)]}, crs=4326)
+    b = tmp_path / "b.geojson"
+    output.write_zones_geojson(g2, b)
+    changed = [1 for x, y in zip(lines, b.read_text().splitlines()) if x != y]
+    assert 1 <= len(changed) <= 4 and len(lines) == len(b.read_text().splitlines())

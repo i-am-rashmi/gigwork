@@ -16,7 +16,21 @@ def _round(coords):
     return [_round(c) for c in coords]
 
 
+def _fmt(node, depth: int) -> str:
+    """Nested coordinate lists, one [x,y] position per line, so a boundary change is a reviewable line diff."""
+    pad = "  " * depth
+    if isinstance(node[0], (int, float)):
+        return f"{pad}[{_num(node[0])},{_num(node[1])}]"
+    inner = ",\n".join(_fmt(c, depth + 1) for c in node)
+    return f"{pad}[\n{inner}\n{pad}]"
+
+
+def _num(v: float) -> str:
+    return json.dumps(round(v, 6))
+
+
 def zones_geojson_text(zones_4326) -> str:
+    """One feature per block; inside, every coordinate pair on its own line. Valid GeoJSON, deterministic."""
     feats = []
     for name, geom in sorted(zip(zones_4326["name"], zones_4326.geometry), key=lambda t: t[0]):
         if geom.geom_type == "Polygon":
@@ -24,11 +38,12 @@ def zones_geojson_text(zones_4326) -> str:
         else:
             geom = type(geom)([orient(g, 1.0) for g in sorted(geom.geoms, key=lambda g: g.bounds)])
         m = mapping(geom)
+        coords = _round(m["coordinates"])
         feats.append(
-            {"type": "Feature", "properties": {"name": name},
-             "geometry": {"type": m["type"], "coordinates": _round(m["coordinates"])}}
+            f'{{"type":"Feature","properties":{{"name":{json.dumps(name, ensure_ascii=False)}}},'
+            f'"geometry":{{"type":"{m["type"]}","coordinates":\n{_fmt(coords, 1)}\n}}}}'
         )
-    return json.dumps({"type": "FeatureCollection", "features": feats}, sort_keys=True, ensure_ascii=False, separators=(",", ":")) + "\n"
+    return '{"type":"FeatureCollection","features":[\n' + ",\n".join(feats) + "\n]}\n"
 
 
 def write_zones_geojson(zones_4326, path: Path) -> None:
