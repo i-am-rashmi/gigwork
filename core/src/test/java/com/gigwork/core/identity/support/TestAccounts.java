@@ -1,6 +1,6 @@
 package com.gigwork.core.identity.support;
 
-import java.time.Instant;
+import java.time.Clock;
 import java.util.UUID;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -20,23 +20,34 @@ public class TestAccounts {
 		}
 	}
 
+	private static final java.util.Random RANDOM = new java.util.Random();
+
 	private final JdbcClient jdbc;
 	private final AccessTokenIssuer issuer;
+	private final Clock clock;
 
-	public TestAccounts(JdbcClient jdbc, AccessTokenIssuer issuer) {
+	/** Tokens are issued by the application's own clock, which tests may move (see MutableClock). */
+	public TestAccounts(JdbcClient jdbc, AccessTokenIssuer issuer, Clock clock) {
 		this.jdbc = jdbc;
 		this.issuer = issuer;
+		this.clock = clock;
 	}
 
 	public TestAccount create() {
 		UUID id = UUID.randomUUID();
 		jdbc.sql("INSERT INTO identity.account (id) VALUES (:id)").param("id", id).update();
+		// a verified number, like every real account has: tests of the login flow count accounts without one as orphans
+		byte[] hash = new byte[32];
+		RANDOM.nextBytes(hash);
+		String mobile = "+9199" + String.format("%08d", RANDOM.nextInt(100_000_000));
+		jdbc.sql("INSERT INTO identity.mobile_identity (account_id, mobile, mobile_hash, verified_at) VALUES (:id, :mobile, :hash, now())")
+				.param("id", id).param("mobile", mobile).param("hash", hash).update();
 		return new TestAccount(id, token(id));
 	}
 
 	/** A token for any account ID, existing or not. */
 	public String token(UUID accountId) {
-		return issuer.issue(accountId, UUID.randomUUID(), Instant.now()).token();
+		return issuer.issue(accountId, UUID.randomUUID(), clock.instant()).token();
 	}
 
 	public void setFirstName(UUID accountId, String firstName) {

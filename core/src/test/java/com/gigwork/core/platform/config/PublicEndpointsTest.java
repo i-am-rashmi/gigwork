@@ -60,6 +60,8 @@ class PublicEndpointsTest {
 				// reference data
 				"GET /v1/categories", "GET /v1/languages", "GET /v1/cities", "GET /v1/cities/*/zones",
 				"GET /v1/localities",
+				// talent profile
+				"GET /v1/talent/*",
 				// platform: health probes and API docs (the docs exist only where springdoc is on)
 				"ANY /actuator/health", "ANY /actuator/health/**",
 				"ANY /v3/api-docs", "ANY /v3/api-docs/**", "ANY /swagger-ui.html", "ANY /swagger-ui/**");

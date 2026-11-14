@@ -16,8 +16,8 @@ public class IdentityTestConfig {
 
 	@Bean
 	TestAccounts testAccounts(org.springframework.jdbc.core.simple.JdbcClient jdbc,
-			com.gigwork.core.identity.security.AccessTokenIssuer issuer) {
-		return new TestAccounts(jdbc, issuer);
+			com.gigwork.core.identity.security.AccessTokenIssuer issuer, java.time.Clock clock) {
+		return new TestAccounts(jdbc, issuer, clock);
 	}
 
 	@Bean
