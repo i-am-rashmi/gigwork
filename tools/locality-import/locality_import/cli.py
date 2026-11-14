@@ -11,7 +11,7 @@ from pathlib import Path
 import geopandas as gpd
 from shapely.geometry import box
 
-from . import clean, output, pins, places, review, zones
+from . import clean, config, output, pins, places, review, zones
 from .geo import lonlat_to_xy, xy_to_lonlat
 
 TOOL_DIR = Path(__file__).resolve().parent.parent
@@ -30,9 +30,11 @@ def parse_args(argv=None):
     p.add_argument("--buffer-m", type=float, default=500, help="keep places this far outside the zones")
     p.add_argument("--max-pin-m", type=float, default=3000, help="max distance to a post office for a PIN")
     p.add_argument("--pin-prefixes", default="",
-                   help="comma-separated PIN prefixes belonging to the city (e.g. 560,562); post offices with other "
-                        "prefixes are ignored because India Post coordinates are sometimes wrong. "
-                        "Default: the most common 3-digit prefix among offices in the region")
+                   help="comma-separated PIN prefixes belonging to the city; overrides config/<city>/settings.json. "
+                        "Post offices with other prefixes are ignored (India Post coordinates are sometimes wrong). "
+                        "Default if neither is set: the most common 3-digit prefix among offices in the region")
+    p.add_argument("--parent-m", type=float, default=2000, help="radius to find a parent area for generic names like '4th Block'")
+    p.add_argument("--config-dir", type=Path, default=None, help="default: tools/locality-import/config/<city>")
     p.add_argument("--dedupe-m", type=float, default=1000, help="merge same-named places within this distance")
     p.add_argument("--simplify-m", type=float, default=10, help="zone simplification tolerance in metres")
     p.add_argument("--seed-dir", type=Path, default=None, help="default: <repo>/infra/seed/<city>")
@@ -70,14 +72,23 @@ def run(args, fetcher=places.fetch_overpass) -> dict:
     inside = clean.filter_inside(parsed, zone_union_m, args.buffer_m)
     by_type_after = Counter(p["place"] for p in inside)
 
-    # 3. Clean: drop unnamed, merge duplicates.
-    named = [p for p in inside if p["name"]]
+    # 3. Clean: drop unnamed, give generic names a parent (or drop them), merge duplicates.
+    named_all = [p for p in inside if p["name"]]
+    named, prefixed, generic_dropped = clean.prefix_generic(named_all, args.parent_m)
     merged, groups = clean.dedupe(named, args.dedupe_m)
 
     # 4. PINs from valid post offices near the region.
     margin_deg = (args.buffer_m + args.max_pin_m) / 111_000 * 1.5
     offices, office_counts = pins.load_offices(args.pins, (w, s, e, n), margin_deg)
-    prefixes = tuple(x.strip() for x in args.pin_prefixes.split(",") if x.strip()) or (pins.modal_prefix(offices),)
+    cfg_dir = args.config_dir or TOOL_DIR / "config" / args.city
+    settings = config.load_settings(cfg_dir)
+    cli_prefixes = tuple(x.strip() for x in args.pin_prefixes.split(",") if x.strip())
+    if cli_prefixes:
+        prefixes, prefix_source = cli_prefixes, "--pin-prefixes"
+    elif settings.get("pin_prefixes"):
+        prefixes, prefix_source = tuple(settings["pin_prefixes"]), f"config/{args.city}/settings.json"
+    else:
+        prefixes, prefix_source = (pins.modal_prefix(offices),), "most common prefix in the region (no config)"
     offices, office_counts.wrong_prefix = pins.filter_by_prefix(offices, prefixes)
     office_counts.prefixes, office_counts.kept = prefixes, len(offices)
     for o in offices:
@@ -87,12 +98,14 @@ def run(args, fetcher=places.fetch_overpass) -> dict:
     for a in assigned:
         lon, lat = xy_to_lonlat(a["x"], a["y"], crs)
         rows.append({**a, "lat": round(lat, 6), "lng": round(lon, 6)})
+    overrides = pins.load_overrides(cfg_dir / "pin-overrides.csv")
+    rows, ov_applied, ov_unmatched = pins.apply_overrides(rows, overrides)
 
     # 5. Committed outputs, then review files.
     output.write_zones_geojson(out_zones, seed_dir / "zones.geojson")
     output.write_localities_csv(rows, seed_dir / "localities.csv")
     params = {
-        "buffer (m)": args.buffer_m, "max PIN distance (m)": args.max_pin_m, "dedupe distance (m)": args.dedupe_m,
+        "buffer (m)": args.buffer_m, "max PIN distance (m)": args.max_pin_m, "dedupe distance (m)": args.dedupe_m, "parent radius (m)": args.parent_m,
         "simplify tolerance (m)": args.simplify_m, "metric CRS": f"EPSG:{crs.to_epsg()}",
         "zones file": args.zones.name, "pin file": args.pins.name,
     }
@@ -100,8 +113,10 @@ def run(args, fetcher=places.fetch_overpass) -> dict:
         "city": args.city, "params": params, "zone_before": before, "zone_after": after,
         "fetched_now": fetched_now, "cache_path": str(cache_path.relative_to(TOOL_DIR)) if cache_path.is_relative_to(TOOL_DIR) else str(cache_path),
         "n_parsed": len(parsed), "by_type_before": dict(by_type_before), "by_type_after": dict(by_type_after),
-        "n_inside": len(inside), "n_outside": len(parsed) - len(inside), "n_unnamed": len(inside) - len(named),
-        "n_named": len(named), "n_final": len(merged), "groups": groups,
+        "n_inside": len(inside), "n_outside": len(parsed) - len(inside), "n_unnamed": len(inside) - len(named_all),
+        "n_named": len(named_all), "n_after_generic": len(named), "n_final": len(merged), "groups": groups,
+        "prefix_source": prefix_source, "prefixed": prefixed, "generic_dropped": generic_dropped,
+        "ov_applied": ov_applied, "ov_unmatched": ov_unmatched,
         "office_counts": office_counts, "localities": rows,
     }
     review_dir.mkdir(parents=True, exist_ok=True)

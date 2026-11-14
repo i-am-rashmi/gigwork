@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from collections import Counter
 from dataclasses import dataclass
 
@@ -74,3 +75,45 @@ def dedupe(places: list[dict], within_m: float) -> tuple[list[dict], list[MergeG
     merged.sort(key=lambda p: (p["name"], p["x"], p["y"]))
     groups.sort(key=lambda g: (-g.max_pairwise_m, g.names))
     return merged, groups
+
+
+# Names that only make sense inside a parent area: "4th Block", "Sector 2", "Further Extension", "3rd Cross".
+_ORDINAL = r"(?:\d+(?:st|nd|rd|th)?|[ivx]+)"
+_UNIT = r"(?:block|stage|phase|sector|cross|main)"
+GENERIC_RE = re.compile(
+    rf"^(?:{_ORDINAL}\s+{_UNIT}(?:\s+\d+[a-z]?)?|{_UNIT}\s+{_ORDINAL}[a-z]?|(?:further|new|old|north|south|east|west)?\s*extension)$",
+    re.IGNORECASE,
+)
+_HAS_UNIT_RE = re.compile(rf"\b{_UNIT}\b|\bextension\b", re.IGNORECASE)
+PARENT_TYPES = ("suburb", "neighbourhood")
+
+
+def is_generic(name: str) -> bool:
+    return bool(GENERIC_RE.match(name.strip()))
+
+
+def prefix_generic(places: list[dict], radius_m: float, parent_types=PARENT_TYPES):
+    """Give generic names a parent: "4th Block" -> "Jayanagar 4th Block".
+
+    The parent is the nearest suburb/neighbourhood-level place within `radius_m` whose own name is not
+    generic or itself a block/stage/sector (so we never build "Jayanagar 1st Block 4th Block").
+    Generic places with no parent in range are dropped. Returns (places, prefixed, dropped) where
+    prefixed = [(old, new, parent_distance_m)] and dropped = [old].
+    """
+    parents = [p for p in places if p["place"] in parent_types and p["name"] and not _HAS_UNIT_RE.search(p["name"])]
+    out, prefixed, dropped = [], [], []
+    for p in places:
+        if not is_generic(p["name"]):
+            out.append(p)
+            continue
+        best = min(
+            ((_dist(p, q), q["name"], q.get("osm", "")) for q in parents if _dist(p, q) <= radius_m),
+            default=None,
+        )
+        if best is None:
+            dropped.append(p["name"])
+            continue
+        new = f"{best[1]} {p['name']}"
+        prefixed.append((p["name"], new, best[0]))
+        out.append({**p, "name": new})
+    return out, prefixed, dropped

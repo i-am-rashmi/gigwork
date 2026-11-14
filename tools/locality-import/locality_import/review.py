@@ -52,10 +52,17 @@ def build_report(ctx: dict) -> str:
     L += ["", "## Cleaning", ""]
     L += [f"- Inside zones + buffer: {ctx['n_inside']:,} (outside dropped: {ctx['n_outside']:,})"]
     L += [f"- Unnamed dropped: {ctx['n_unnamed']:,}"]
-    L += [f"- Named, before merge: {ctx['n_named']:,}"]
-    L += [f"- Merge groups: {len(ctx['groups']):,}; places removed by merging: {ctx['n_named'] - ctx['n_final']:,}"]
+    L += [f"- Named: {ctx['n_named']:,}"]
+    L += [f"- Generic names (e.g. '4th Block'): prefixed with a parent area: {len(ctx['prefixed']):,}; dropped, no parent within {ctx['params']['parent radius (m)']} m: {len(ctx['generic_dropped']):,}"]
+    L += [f"- Before merge: {ctx['n_after_generic']:,}"]
+    L += [f"- Merge groups: {len(ctx['groups']):,}; places removed by merging: {ctx['n_after_generic'] - ctx['n_final']:,}"]
     L += [f"- **Localities written: {ctx['n_final']:,}**", ""]
 
+    L += ["### Generic names: examples", ""]
+    ex = sorted(ctx["prefixed"], key=lambda t: (t[1], t[0]))
+    ex = ex[:: max(1, len(ex) // 20)][:20]
+    L += ([f"- {o} -> **{n}** (parent {d:,.0f} m away)" for o, n, d in ex] or ["None prefixed."])
+    L += ["", f"Dropped (no parent in range), first 20 of {len(ctx['generic_dropped'])}: " + (", ".join(sorted(ctx["generic_dropped"])[:20]) or "none"), ""]
     L += ["### Duplicate merge groups", ""]
     if ctx["groups"]:
         L += ["| Names | Members | Max pairwise distance (m) |", "|---|---:|---:|"]
@@ -71,22 +78,34 @@ def build_report(ctx: dict) -> str:
           f"- Dropped, missing/zero/invalid coordinates: {c.bad_coords:,}",
           f"- Dropped, invalid PIN: {c.bad_pin:,}",
           f"- Dropped, outside the region (zones bbox + margin): {c.out_of_region:,}",
-          f"- Dropped, PIN prefix not in {', '.join(c.prefixes)} (offices geocoded into the wrong city): {c.wrong_prefix:,}",
+          f"- Allowed PIN prefixes: {', '.join(c.prefixes)} (from {ctx['prefix_source']})",
+          f"- Dropped, PIN prefix not allowed (offices geocoded into the wrong city): {c.wrong_prefix:,}",
           f"- Offices used as candidates: {c.kept:,}"]
     rows = ctx["localities"]
     with_pin = [r for r in rows if r["pin"]]
+    auto_pin = [r for r in with_pin if r.get("pin_source") == "auto"]
     L += ["", f"- Localities with a PIN: {len(with_pin):,} / {len(rows):,}",
-          f"- Localities **without** a PIN (no valid office within {ctx['params']['max PIN distance (m)']} m): {len(rows) - len(with_pin):,}", ""]
+          f"- Localities **without** a PIN (no valid office within {ctx['params']['max PIN distance (m)']} m, and no override): {len(rows) - len(with_pin):,}", ""]
     L += ["### Localities without a PIN", ""]
     none = [r for r in rows if not r["pin"]]
     L += ([f"- {r['name']} ({r['lat']:.6f}, {r['lng']:.6f})" for r in none] or ["None."])
     L += ["", f"### PIN taken from more than {FAR_PIN_M // 1000} km away", ""]
-    far = sorted((r for r in with_pin if r["pin_distance_m"] > FAR_PIN_M), key=lambda r: -r["pin_distance_m"])
+    far = sorted((r for r in auto_pin if r["pin_distance_m"] > FAR_PIN_M), key=lambda r: -r["pin_distance_m"])
     L += ([f"- {r['name']}: {r['pin']} ({r['pin_office']}), {r['pin_distance_m'] / 1000:.2f} km" for r in far] or ["None."])
     dist = Counter()
-    for r in with_pin:
+    for r in auto_pin:
         dist["≤ 1 km" if r["pin_distance_m"] <= 1000 else "1–2 km" if r["pin_distance_m"] <= 2000 else "> 2 km"] += 1
     L += ["", "Distance to the PIN's post office: " + ", ".join(f"{k}: {dist[k]:,}" for k in ("≤ 1 km", "1–2 km", "> 2 km")), ""]
+    L += ["## PIN overrides (config/<city>/pin-overrides.csv)", ""]
+    if ctx["ov_applied"]:
+        L += ["| Name | Old PIN | New PIN | Rows | Reason |", "|---|---|---|---:|---|"]
+        L += [f"| {n} | {o} | {p} | {k} | {why} |" for n, o, p, why, k in ctx["ov_applied"]]
+    else:
+        L.append("None applied.")
+    if ctx["ov_unmatched"]:
+        L += ["", "**Overrides that matched no locality (check the spelling):**"]
+        L += [f"- {o['name']} ({o['pin']})" for o in ctx["ov_unmatched"]]
+    L.append("")
     return "\n".join(L)
 
 
@@ -103,7 +122,7 @@ def write_map(zones_4326, rows: list[dict], path: Path) -> None:
     ).add_to(m)
     for r in rows:
         has = bool(r["pin"])
-        dist = f"{r['pin_distance_m']:,.0f} m" if has else "n/a"
+        dist = "manual override" if r.get("pin_source") == "override" else f"{r['pin_distance_m']:,.0f} m" if has else "n/a"
         popup = f"<b>{r['name']}</b><br>PIN: {r['pin'] or '(none)'}<br>Source distance: {dist}"
         folium.CircleMarker(
             [r["lat"], r["lng"]], radius=5, color="#1b7f3b" if has else "#c0392b",

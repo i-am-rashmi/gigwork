@@ -60,3 +60,24 @@ def test_wrong_prefix_office_never_wins_even_if_nearest():
 def test_modal_prefix():
     assert pins.modal_prefix([O("560001", "a", 0, 0), O("560002", "b", 0, 0), O("577001", "c", 0, 0)]) == "560"
     assert pins.modal_prefix([]) == ""
+
+
+def test_overrides_apply_by_name_and_report_unmatched(tmp_path):
+    f = tmp_path / "o.csv"
+    f.write_text("name,pin,reason\nBellanduru,560103,checked on India Post site\nNowhere,560001,typo\n", encoding="utf-8")
+    ov = pins.load_overrides(f)
+    rows = [{"name": "Bellanduru", "pin": "", "pin_distance_m": None}, {"name": "Other", "pin": "560001", "pin_distance_m": 5.0}]
+    out, applied, unmatched = pins.apply_overrides(rows, ov)
+    assert out[0]["pin"] == "560103" and out[0]["pin_source"] == "override" and out[1]["pin"] == "560001"
+    assert applied == [("Bellanduru", "(none)", "560103", "checked on India Post site", 1)]
+    assert [u["name"] for u in unmatched] == ["Nowhere"]
+
+
+def test_overrides_missing_empty_and_invalid(tmp_path):
+    assert pins.load_overrides(tmp_path / "none.csv") == []
+    e = tmp_path / "e.csv"; e.write_text("name,pin,reason\n", encoding="utf-8")
+    assert pins.load_overrides(e) == []
+    import pytest
+    bad = tmp_path / "b.csv"; bad.write_text("name,pin,reason\nX,12,why\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        pins.load_overrides(bad)

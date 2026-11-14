@@ -41,3 +41,39 @@ def test_dedupe_is_independent_of_input_order():
 def test_dedupe_picks_most_common_spelling():
     merged, _ = clean.dedupe([P("HSR", 0, 0), P("hsr", 10, 0), P("hsr", 20, 0)], 1000)
     assert merged[0]["name"] == "hsr"
+
+
+def Q(name, x, y, place="neighbourhood"):
+    return P(name, x, y, place)
+
+
+def test_is_generic():
+    for n in ("4th Block", "1st Block", "Sector 3", "6th Block", "Further Extension", "3rd Cross", "2nd Stage", "Phase 2", "Main 5", "II Phase"):
+        assert clean.is_generic(n), n
+    for n in ("Jayanagar 4th Block", "HSR Layout", "BTM Layout 2nd Stage", "Koramangala", "Extension Road Colony"):
+        assert not clean.is_generic(n), n
+
+
+def test_generic_gets_nearest_parent_within_radius():
+    places = [Q("Jayanagar", 0, 0), Q("Far Place", 1_500, 0), P("4th Block", 400, 0)]
+    out, prefixed, dropped = clean.prefix_generic(places, 2_000)
+    assert "Jayanagar 4th Block" in [p["name"] for p in out]
+    assert prefixed == [("4th Block", "Jayanagar 4th Block", 400)] and dropped == []
+
+
+def test_generic_without_parent_in_range_is_dropped():
+    out, prefixed, dropped = clean.prefix_generic([Q("Jayanagar", 0, 0), P("Sector 2", 2_500, 0)], 2_000)
+    assert [p["name"] for p in out] == ["Jayanagar"] and dropped == ["Sector 2"]
+
+
+def test_parent_must_not_be_a_block_village_or_generic():
+    places = [Q("Jayanagar 1st Block", 10, 0), P("Hamlet", 20, 0, "hamlet"), Q("Sector 1", 30, 0), Q("Real Parent", 900, 0), P("4th Block", 0, 0)]
+    out, prefixed, _ = clean.prefix_generic(places, 2_000)
+    assert [n for o, n, _ in prefixed if o == "4th Block"] == ["Real Parent 4th Block"]
+
+
+def test_prefixed_name_merges_with_existing_duplicate_after_dedupe():
+    places = [Q("Jayanagar", 0, 0), Q("Jayanagar 4th Block", 100, 0), P("4th Block", 200, 0)]
+    out, _, _ = clean.prefix_generic(places, 2_000)
+    merged, groups = clean.dedupe(out, 1000)
+    assert sorted(p["name"] for p in merged) == ["Jayanagar", "Jayanagar 4th Block"] and groups[0].count == 2
