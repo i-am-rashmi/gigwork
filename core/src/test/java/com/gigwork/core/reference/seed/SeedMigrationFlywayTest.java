@@ -121,10 +121,28 @@ class SeedMigrationFlywayTest {
 			JdbcTemplate jdbc = new JdbcTemplate(dataSource);
 			flyway(dataSource, new DirectorySeedFiles(seed)).migrate();
 
-			Files.writeString(seed.resolve("cities.csv"), Files.readString(seed.resolve("cities.csv")) + "pune,Pune,false\n");
+			Files.writeString(seed.resolve("cities.csv"), Files.readString(seed.resolve("cities.csv")) + "pune,Pune,false,Asia/Kolkata\n");
 			flyway(dataSource, new DirectorySeedFiles(seed)).migrate();
 
 			assertThat(applied(jdbc, BENGALURU)).isEqualTo(1);
+		}
+	}
+
+	@Test
+	void aCitysTimeZoneComesFromTheSeedAndAnUnknownZoneFailsTheMigration(@TempDir Path seed) throws IOException {
+		copy(SeedFixtures.SEED_DIR, seed);
+		try (PostgreSQLContainer db = newDatabase()) {
+			DataSource dataSource = dataSource(db);
+			JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+			flyway(dataSource, new DirectorySeedFiles(seed)).migrate();
+			assertThat(value(jdbc, "SELECT time_zone FROM reference.city WHERE slug = 'bengaluru'")).isEqualTo("Asia/Kolkata");
+
+			Files.writeString(seed.resolve("cities.csv"), Files.readString(seed.resolve("cities.csv")).replace("Asia/Kolkata", "Asia/Kolkatta"));
+			assertThatThrownBy(() -> flyway(dataSource, new DirectorySeedFiles(seed)).migrate()).hasStackTraceContaining("not a known time zone");
+
+			Files.writeString(seed.resolve("cities.csv"), Files.readString(seed.resolve("cities.csv")).replace("Asia/Kolkatta", "Asia/Dubai"));
+			flyway(dataSource, new DirectorySeedFiles(seed)).migrate(); // an edited zone reloads the city migration
+			assertThat(value(jdbc, "SELECT time_zone FROM reference.city WHERE slug = 'bengaluru'")).isEqualTo("Asia/Dubai");
 		}
 	}
 
@@ -240,7 +258,7 @@ class SeedMigrationFlywayTest {
 			flyway(dataSource, new DirectorySeedFiles(seed)).migrate();
 			assertThat(value(jdbc, "SELECT status FROM reference.city WHERE slug = 'bengaluru'")).isEqualTo("LIVE");
 
-			Files.writeString(seed.resolve("cities.csv"), Files.readString(seed.resolve("cities.csv")).replace("bengaluru,Bengaluru,true", "bengaluru,Bengaluru,false"));
+			Files.writeString(seed.resolve("cities.csv"), Files.readString(seed.resolve("cities.csv")).replace("bengaluru,Bengaluru,true,Asia/Kolkata", "bengaluru,Bengaluru,false,Asia/Kolkata"));
 			flyway(dataSource, new DirectorySeedFiles(seed)).migrate();
 
 			assertThat(value(jdbc, "SELECT status FROM reference.city WHERE slug = 'bengaluru'")).isEqualTo("NOT_LIVE");

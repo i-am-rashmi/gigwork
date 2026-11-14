@@ -92,11 +92,19 @@ class ReferenceSchemaTest {
 
 	@Test
 	void citySlugsAreUniqueAndZoneNamesAreUniquePerCity() {
-		assertThatThrownBy(() -> jdbc.sql("INSERT INTO reference.city (id, slug, name, status) VALUES (:id, 'bengaluru', 'Other', 'LIVE')")
+		assertThatThrownBy(() -> jdbc.sql("INSERT INTO reference.city (id, slug, name, status, time_zone) VALUES (:id, 'bengaluru', 'Other', 'LIVE', 'Asia/Kolkata')")
 				.param("id", UUID.randomUUID()).update()).isInstanceOf(DataIntegrityViolationException.class);
 		assertThatThrownBy(() -> jdbc.sql("""
 				INSERT INTO reference.zone (id, city_id, name, boundary)
 				SELECT :id, city_id, name, boundary FROM reference.zone WHERE name = 'East'""")
+				.param("id", UUID.randomUUID()).update()).isInstanceOf(DataIntegrityViolationException.class);
+	}
+
+	@Test
+	void aCityNeedsATimeZoneAndItIsNotBlank() {
+		assertThatThrownBy(() -> jdbc.sql("INSERT INTO reference.city (id, slug, name, status) VALUES (:id, 'nozone', 'No zone', 'LIVE')")
+				.param("id", UUID.randomUUID()).update()).isInstanceOf(DataIntegrityViolationException.class);
+		assertThatThrownBy(() -> jdbc.sql("INSERT INTO reference.city (id, slug, name, status, time_zone) VALUES (:id, 'blank', 'Blank', 'LIVE', '  ')")
 				.param("id", UUID.randomUUID()).update()).isInstanceOf(DataIntegrityViolationException.class);
 	}
 

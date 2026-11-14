@@ -19,6 +19,8 @@ class City {
 	private String slug;
 	private String name;
 	private String status;
+	@jakarta.persistence.Column(name = "time_zone")
+	private String timeZone;
 
 	protected City() {
 	}
@@ -33,6 +35,10 @@ class City {
 
 	String getName() {
 		return name;
+	}
+
+	String getTimeZone() {
+		return timeZone;
 	}
 
 	boolean isLive() {

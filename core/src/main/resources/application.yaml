@@ -47,6 +47,12 @@ gigwork:
     portfolio:
       blocked-hosts: [bit.ly, tinyurl.com, t.co, goo.gl, rb.gy, cutt.ly, is.gd]   # URL shorteners (FR-6)
 
+  availability:
+    default-time-zone: Asia/Kolkata   # all-day blocks and the calendar of a Talent with no saved location
+    max-upcoming-blocks: 200          # FR-7: busy blocks that have not ended yet, per Talent
+    max-block-days: 90                # FR-7: longest busy block
+    max-calendar-days: 92             # longest range of one calendar request
+
 springdoc:
   # API docs and Swagger UI are off by default; the local profile switches them on
   api-docs:

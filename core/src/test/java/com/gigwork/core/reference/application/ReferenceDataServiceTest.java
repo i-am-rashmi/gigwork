@@ -38,7 +38,7 @@ class ReferenceDataServiceTest {
 				List.of(new CategoryInfo(LIVE_CATEGORY, "anchor", "Anchor", "ON_SITE", true, true, 1, List.of(LIVE_SPECIALISATION)),
 						new CategoryInfo(RETIRED_CATEGORY, "gone", "Gone", "BOTH", false, false, 2, List.of())),
 				List.of(LIVE_SPECIALISATION, RETIRED_SPECIALISATION), List.of(new LanguageInfo("kn", "Kannada", 1)),
-				List.of(new CityInfo(CITY, "bengaluru", "Bengaluru")), List.of(new ZoneInfo(ZONE, CITY, "East")),
+				List.of(new CityInfo(CITY, "bengaluru", "Bengaluru", "Asia/Kolkata")), List.of(new ZoneInfo(ZONE, CITY, "East")),
 				List.of(new LocalityInfo(UUID.randomUUID(), CITY, ZONE, "Indiranagar", "560038", 12.97, 77.64)));
 	}
 

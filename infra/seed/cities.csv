@@ -1,2 +1,2 @@
-slug,name,live
-bengaluru,Bengaluru,true
+slug,name,live,time_zone
+bengaluru,Bengaluru,true,Asia/Kolkata
