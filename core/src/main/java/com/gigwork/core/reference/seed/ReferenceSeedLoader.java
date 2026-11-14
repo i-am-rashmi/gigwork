@@ -114,11 +114,11 @@ final class ReferenceSeedLoader {
 	// ---- one city -------------------------------------------------------------------------------------------
 
 	/** A city's row in cities.csv. */
-	record CityRow(String slug, String name, boolean live) {
+	record CityRow(String slug, String name, boolean live, String timeZone) {
 
 		/** What the checksum hashes: only this city's row, so adding another city never invalidates this migration. */
 		byte[] canonical() {
-			return (slug + "|" + name + "|" + live).getBytes(StandardCharsets.UTF_8);
+			return (slug + "|" + name + "|" + live + "|" + timeZone).getBytes(StandardCharsets.UTF_8);
 		}
 
 	}
@@ -126,19 +126,34 @@ final class ReferenceSeedLoader {
 	static CityRow cityRow(SeedFiles files, String slug) {
 		for (Map<String, String> row : read(files, "cities.csv")) {
 			if (slug.equals(row.get("slug"))) {
-				return new CityRow(slug, required(row, "name", "cities.csv"), bool(row, "live", "cities.csv"));
+				return new CityRow(slug, required(row, "name", "cities.csv"), bool(row, "live", "cities.csv"),
+						timeZone(required(row, "time_zone", "cities.csv"), slug));
 			}
 		}
 		throw new SeedDataException("cities.csv has no row for city '" + slug + "'");
+	}
+
+	/** An IANA zone id such as Asia/Kolkata; anything java.time does not know is refused (a typo must not reach the database). */
+	private static String timeZone(String id, String slug) {
+		try {
+			if (!java.time.ZoneId.getAvailableZoneIds().contains(id)) {
+				throw new SeedDataException("cities.csv: '" + id + "' is not a known time zone (city " + slug + ")");
+			}
+			return id;
+		}
+		catch (java.time.DateTimeException e) {
+			throw new SeedDataException("cities.csv: invalid time zone for city " + slug, e);
+		}
 	}
 
 	static void loadCity(JdbcTemplate jdbc, SeedFiles files, String slug) {
 		CityRow city = cityRow(files, slug);
 		UUID cityId = SeedIds.city(slug);
 		jdbc.update("""
-				INSERT INTO reference.city (id, slug, name, status) VALUES (?, ?, ?, ?)
-				ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, status = EXCLUDED.status
-				""", cityId, slug, city.name(), city.live() ? "LIVE" : "NOT_LIVE");
+				INSERT INTO reference.city (id, slug, name, status, time_zone) VALUES (?, ?, ?, ?, ?)
+				ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, status = EXCLUDED.status,
+				    time_zone = EXCLUDED.time_zone
+				""", cityId, slug, city.name(), city.live() ? "LIVE" : "NOT_LIVE", city.timeZone());
 
 		// PostgreSQL parses the GeoJSON; one row per feature: its name and its geometry.
 		String geojson = new String(files.read(slug + "/zones.geojson"), StandardCharsets.UTF_8);

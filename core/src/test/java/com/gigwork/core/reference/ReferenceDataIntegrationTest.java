@@ -61,6 +61,7 @@ class ReferenceDataIntegrationTest {
 		assertThat(reference.languages().get(0).code()).isEqualTo("en");
 		CityInfo bengaluru = reference.liveCities().get(0);
 		assertThat(bengaluru.slug()).isEqualTo("bengaluru");
+		assertThat(bengaluru.timeZone()).isEqualTo("Asia/Kolkata");
 		assertThat(reference.zones(bengaluru.id())).extracting(ZoneInfo::name)
 				.containsExactly("Central", "East", "North", "South", "West");
 	}

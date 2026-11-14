@@ -58,7 +58,7 @@ public class ReferenceReader {
 
 		List<City> liveCityRows = cities.findAll().stream().filter(City::isLive).toList();
 		Set<UUID> liveCityIds = liveCityRows.stream().map(City::getId).collect(Collectors.toSet());
-		List<CityInfo> liveCities = liveCityRows.stream().map(c -> new CityInfo(c.getId(), c.getSlug(), c.getName()))
+		List<CityInfo> liveCities = liveCityRows.stream().map(c -> new CityInfo(c.getId(), c.getSlug(), c.getName(), c.getTimeZone()))
 				.sorted(Comparator.comparing(CityInfo::name).thenComparing(CityInfo::slug)).toList();
 
 		List<ZoneInfo> liveZones = zones.findAll().stream().filter(z -> z.isLive() && liveCityIds.contains(z.getCityId()))
