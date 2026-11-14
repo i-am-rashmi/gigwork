@@ -22,6 +22,7 @@ import com.gigwork.core.identity.AccountNames;
 import com.gigwork.core.profile.application.TalentProfileService;
 import com.gigwork.core.profile.application.WorkCommand;
 import com.gigwork.core.profile.domain.ProfileType;
+import com.gigwork.core.reference.LocationResolver;
 import com.gigwork.core.reference.ReferenceData;
 
 /**
@@ -48,6 +49,8 @@ class ProfileModuleTest {
 	JdbcClient jdbc;
 	@MockitoBean
 	ReferenceData reference;
+	@MockitoBean
+	LocationResolver locations;
 	@MockitoBean
 	AccountNames names;
 

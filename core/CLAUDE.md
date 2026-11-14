@@ -21,6 +21,7 @@ Inside each module (all sub-packages are internal):
 - `domain`: types, rules and exceptions
 - `persistence`: JPA entities and repositories
 - `config`: configuration classes and properties
+- `jobs`: scheduled jobs (see Scheduled jobs)
 
 A module may have additional sub-packages for a distinct technical concern that would crowd a layer (for example identity's `security` and `otp` packages). Name them after the concern, not a pattern.
 
@@ -46,6 +47,17 @@ The base package holds only the module's public API. Result records that never l
 - Invariants belong in the database where possible (ADR-0002): unique constraints, partial unique indexes, the exclusion constraint for overlapping bookings, conditional updates such as `UPDATE ... WHERE status = 'OPEN'`. Don't replace these with check-then-act code.
 - Code that may be refused by a database constraint, as an expected answer (a booking that overlaps), must not ruin the caller's transaction: PostgreSQL aborts a transaction after a failed statement. Spring's JPA transaction manager cannot do `PROPAGATION_NESTED` with Hibernate, so take a JDBC savepoint on the transaction's connection (`DataSourceUtils.getConnection`), as `BookingService` does, and throw only after the transaction block ends. Simultaneous inserts into an exclusion constraint can deadlock; serialise them per owner with `pg_advisory_xact_lock` (the constraint still decides).
 - IDs are random UUIDs, never sequences (NFR-33). City-local rows carry `city_id`.
+
+## Scheduled jobs (ADR-0010)
+
+- **Correctness comes from the SQL, never from the lock.** A job is a conditional update or delete that is safe to run twice at the same time (`UPDATE ... WHERE status = 'OPEN' AND start_at <= :now`). Events it causes are written in the same transaction.
+- **ShedLock only makes one instance do the work per tick.** Put `@Scheduled` and `@SchedulerLock(name, lockAtLeastFor, lockAtMostFor)` on the method: `lockAtLeastFor` a little below the interval, `lockAtMostFor` far above a run. The lock table is `platform.shedlock`.
+- **Jobs sweep due rows; there are no per-item timers.** Back the sweep with a partial index on the open rows (`start_at WHERE status = 'OPEN'`). Large sweeps work in batches in separate transactions, selecting with `FOR UPDATE SKIP LOCKED`.
+- **Each module owns its jobs**, in its `jobs` package: a thin class that only holds the schedule and the lock and calls an application service. The work is in that service (always a bean), so tests run exactly what the job runs. Platform owns the scheduling configuration, ShedLock and the switch.
+- **Every job class carries `@ConditionalOnJobsEnabled` (platform).** `gigwork.jobs.enabled` is true by default and false in tests. Enabling scheduling is not an off switch: Spring Modulith enables it too, so an unmarked `@Scheduled` method would run in tests.
+- **Report each run with `JobRuns.record(name, work)`:** it logs the rows changed and the duration and records `gigwork.job.rows` and `gigwork.job.duration`.
+- **Time comes from the injected `Clock`.** A request never relies on a job having run: editing a gig checks `start_at > now` itself.
+- **Every job has a test that runs it twice in parallel** (`Concurrently.runAll`) and checks each row changed, and each event was written, exactly once. A test that enables jobs closes its context (`@DirtiesContext`) so no scheduler keeps running against later tests.
 
 ## Code style
 

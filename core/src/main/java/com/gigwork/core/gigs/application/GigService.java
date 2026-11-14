@@ -1,0 +1,282 @@
+package com.gigwork.core.gigs.application;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import com.gigwork.core.gigs.GigCancelled;
+import com.gigwork.core.gigs.GigChanged;
+import com.gigwork.core.gigs.GigPublished;
+import com.gigwork.core.gigs.config.GigProperties;
+import com.gigwork.core.gigs.domain.GigNotFoundException;
+import com.gigwork.core.gigs.domain.GigNotOpenException;
+import com.gigwork.core.gigs.domain.GigRules;
+import com.gigwork.core.gigs.domain.GigStatus;
+import com.gigwork.core.gigs.domain.InvalidGigException;
+import com.gigwork.core.gigs.domain.PageCursor;
+import com.gigwork.core.gigs.domain.PosterNameRequiredException;
+import com.gigwork.core.gigs.domain.WorkMode;
+import com.gigwork.core.gigs.persistence.GigFields;
+import com.gigwork.core.gigs.persistence.GigFilter;
+import com.gigwork.core.gigs.persistence.Keyset;
+import com.gigwork.core.gigs.persistence.GigStore;
+import com.gigwork.core.gigs.persistence.StoredGig;
+import com.gigwork.core.identity.AccountNames;
+import com.gigwork.core.reference.CategoryInfo;
+import com.gigwork.core.reference.InvalidLocationException;
+import com.gigwork.core.reference.LocationResolver;
+import com.gigwork.core.reference.ReferenceData;
+import com.gigwork.core.reference.ResolvedLocation;
+import com.gigwork.core.reference.SpecialisationInfo;
+import com.gigwork.core.reference.ZoneInfo;
+
+/**
+ * Publishing, editing and cancelling gigs (FR-15, FR-16, FR-18, FR-19).
+ *
+ * <p>Every request is validated first (no lock, no write). A write is then one conditional statement in a transaction
+ * that also publishes the event, so the event exists exactly when the change does. Whether a change was refused
+ * because the gig isn't the caller's, isn't open any more or has started is worked out only after the statement
+ * matched no row, so the check and the change can never disagree.
+ */
+@Service
+public class GigService {
+
+	private final GigStore store;
+	private final ReferenceData reference;
+	private final LocationResolver locations;
+	private final AccountNames names;
+	private final GigViews views;
+	private final GigProperties properties;
+	private final TransactionTemplate transaction;
+	private final ApplicationEventPublisher events;
+	private final Clock clock;
+
+	GigService(GigStore store, ReferenceData reference, LocationResolver locations, AccountNames names, GigViews views,
+			GigProperties properties, TransactionTemplate transaction, ApplicationEventPublisher events, Clock clock) {
+		this.store = store;
+		this.reference = reference;
+		this.locations = locations;
+		this.names = names;
+		this.views = views;
+		this.properties = properties;
+		this.transaction = transaction;
+		this.events = events;
+		this.clock = clock;
+	}
+
+	/** Publishes a gig as OPEN (FR-15). */
+	public GigView publish(UUID posterId, GigDraft draft) {
+		if (names.firstName(posterId).isEmpty()) {
+			throw new PosterNameRequiredException();
+		}
+		Instant now = clock.instant();
+		GigFields fields = validate(draft, now);
+		UUID id = UUID.randomUUID();
+		transaction.executeWithoutResult(status -> {
+			store.insert(id, posterId, fields, now);
+			events.publishEvent(new GigPublished(id, posterId, fields.categoryId(), fields.specialisationId(),
+					fields.languageCode(), fields.workMode().name(), fields.cityId(), fields.zoneId(), fields.startAt(),
+					fields.endAt(), now));
+		});
+		return views.of(store.find(id).orElseThrow(), Optional.of(posterId));
+	}
+
+	/**
+	 * Replaces the editable fields of an open gig that has not started (FR-18). The draft is checked against the
+	 * gig's own category and work mode, which are read first: both are fixed once a gig is published, so nothing can
+	 * change them between this read and the update. A gig that doesn't exist or isn't the caller's is a 404 before
+	 * anything else is looked at.
+	 */
+	public GigView edit(UUID posterId, UUID gigId, GigDraft draft) {
+		Instant now = clock.instant();
+		StoredGig current = store.find(gigId).filter(g -> g.posterId().equals(posterId))
+				.orElseThrow(GigNotFoundException::new);
+		GigFields fields = validate(draft.forGig(current.categoryId(), current.workMode()), now);
+		boolean changed = Boolean.TRUE.equals(transaction.execute(status -> {
+			Optional<GigStore.Changes> changes = store.update(gigId, posterId, fields, now);
+			changes.filter(c -> c.dateTime() || c.location() || c.matching())
+					.ifPresent(c -> events.publishEvent(new GigChanged(gigId, posterId, fields.categoryId(),
+							fields.specialisationId(), fields.languageCode(), fields.workMode().name(), fields.cityId(),
+							fields.zoneId(), fields.startAt(), fields.endAt(), c.dateTime(), c.location(), c.matching(),
+							now)));
+			return changes.isPresent();
+		}));
+		if (!changed) {
+			throw refusal(posterId, gigId);
+		}
+		return views.of(store.find(gigId).orElseThrow(), Optional.of(posterId));
+	}
+
+	/** Cancels the Poster's open gig (FR-19). Cancelling a filled gig comes with hiring. */
+	public GigView cancel(UUID posterId, UUID gigId, String reason) {
+		Instant now = clock.instant();
+		String trimmed = reason == null || reason.isBlank() ? null : reason.strip();
+		if (trimmed != null && trimmed.codePointCount(0, trimmed.length()) > 500) {
+			throw new InvalidGigException("The reason can be at most 500 characters.");
+		}
+		boolean cancelled = Boolean.TRUE.equals(transaction.execute(status -> {
+			boolean done = store.cancel(gigId, posterId, trimmed, now);
+			if (done) {
+				events.publishEvent(new GigCancelled(gigId, posterId, now));
+			}
+			return done;
+		}));
+		if (!cancelled) {
+			throw refusal(posterId, gigId);
+		}
+		return views.of(store.find(gigId).orElseThrow(), Optional.of(posterId));
+	}
+
+	/**
+	 * Why a conditional statement matched no row: 404 for a gig that doesn't exist or isn't the caller's (never says
+	 * which), 409 when it is the caller's but is not open (or, for an edit, has already started).
+	 */
+	private RuntimeException refusal(UUID posterId, UUID gigId) {
+		Optional<StoredGig> gig = store.find(gigId).filter(g -> g.posterId().equals(posterId));
+		return gig.isEmpty() ? new GigNotFoundException() : new GigNotOpenException();
+	}
+
+	// ---- reading ----------------------------------------------------------------------------------------------
+
+	static final int MAX_FILTER_VALUES = 50;
+
+	/** Open gigs, newest first, filtered (FR-9, FR-11 in Phase 1). Anyone may ask; {@code viewer} is empty for a visitor. */
+	public GigPage open(GigQuery query, Optional<UUID> viewer) {
+		int size = pageSize(query.size());
+		GigFilter filter = filter(query);
+		Keyset after = keyset(query.cursor());
+		return page(store.listOpen(filter, after, size + 1), size, viewer);
+	}
+
+	/** The Poster's own gigs in every status, newest first. */
+	public GigPage mine(UUID posterId, String cursor, Integer requestedSize) {
+		int size = pageSize(requestedSize);
+		return page(store.listByPoster(posterId, keyset(cursor), size + 1), size, Optional.of(posterId));
+	}
+
+	/** An open gig, or any gig for its own Poster; for everyone else a gig that is not open does not exist. */
+	public GigView gig(UUID gigId, Optional<UUID> viewer) {
+		StoredGig gig = store.find(gigId)
+				.filter(g -> g.status() == GigStatus.OPEN || viewer.filter(g.posterId()::equals).isPresent())
+				.orElseThrow(GigNotFoundException::new);
+		return views.of(gig, viewer);
+	}
+
+	private GigPage page(List<StoredGig> fetched, int size, Optional<UUID> viewer) {
+		boolean more = fetched.size() > size;
+		List<StoredGig> shown = more ? fetched.subList(0, size) : fetched;
+		String next = more ? new PageCursor(shown.get(size - 1).publishedAt(), shown.get(size - 1).id()).encode() : null;
+		return new GigPage(views.of(shown, viewer), next);
+	}
+
+	private int pageSize(Integer requested) {
+		if (requested == null) {
+			return properties.defaultPageSize();
+		}
+		if (requested < 1 || requested > properties.maxPageSize()) {
+			throw new InvalidGigException("The page size must be between 1 and " + properties.maxPageSize() + ".");
+		}
+		return requested;
+	}
+
+	private static Keyset keyset(String cursor) {
+		if (cursor == null || cursor.isBlank()) {
+			return null;
+		}
+		PageCursor decoded = PageCursor.decode(cursor);
+		return new Keyset(decoded.publishedAt(), decoded.id());
+	}
+
+	/**
+	 * The zones' cities are worked out here so the query can use the city index; a zone that doesn't exist matches no
+	 * on-site gig (a remote gig still matches, as with any location filter).
+	 */
+	private GigFilter filter(GigQuery query) {
+		List<UUID> categories = distinct(query.categoryIds(), "categoryId");
+		List<UUID> zones = distinct(query.zoneIds(), "zoneId");
+		List<UUID> cities = new ArrayList<>();
+		if (query.cityId() != null) {
+			cities.add(query.cityId());
+		}
+		else {
+			zones.stream().map(reference::zone).flatMap(Optional::stream).map(ZoneInfo::cityId).distinct().forEach(cities::add);
+		}
+		return new GigFilter(categories, cities, zones);
+	}
+
+	private static List<UUID> distinct(List<UUID> values, String name) {
+		List<UUID> distinct = values == null ? List.of() : values.stream().distinct().toList();
+		if (distinct.size() > MAX_FILTER_VALUES) {
+			throw new InvalidGigException("At most " + MAX_FILTER_VALUES + " values can be given for " + name + ".");
+		}
+		return distinct;
+	}
+
+	// ---- the rules that need reference data ----------------------------------------------------------------
+
+	private GigFields validate(GigDraft d, Instant now) {
+		if (d.categoryId() == null || d.workMode() == null) {
+			throw new InvalidGigException("A category and a work mode are required.");
+		}
+		CategoryInfo category = reference.category(d.categoryId()).filter(CategoryInfo::live)
+				.orElseThrow(() -> new InvalidGigException("Choose a category we offer."));
+		if (!category.workMode().equals("BOTH") && !category.workMode().equals(d.workMode().name())) {
+			throw new InvalidGigException("This category doesn't allow " + (d.workMode() == WorkMode.REMOTE
+					? "remote" : "on-site") + " gigs.");
+		}
+		if (d.specialisationId() != null) {
+			reference.specialisation(d.specialisationId()).filter(SpecialisationInfo::live)
+					.filter(s -> s.categoryId().equals(category.id()))
+					.orElseThrow(() -> new InvalidGigException("Choose a specialisation of the chosen category."));
+		}
+		String language = d.languageCode() == null || d.languageCode().isBlank() ? null : d.languageCode().strip();
+		if (language != null) {
+			if (!category.languageRelevant()) {
+				throw new InvalidGigException("A language can only be given for a category about performing or "
+						+ "writing in a language, such as Anchor, Singer or Content writer.");
+			}
+			if (reference.languages().stream().noneMatch(l -> l.code().equals(language))) {
+				throw new InvalidGigException("Choose a language we offer.");
+			}
+		}
+		String title = GigRules.text(d.title(), "title", GigRules.TITLE_MAX);
+		String description = GigRules.text(d.description(), "description", GigRules.DESCRIPTION_MAX);
+		Instant start = d.startAt() == null ? null : d.startAt().truncatedTo(ChronoUnit.MICROS);
+		Instant end = d.endAt() == null ? null : d.endAt().truncatedTo(ChronoUnit.MICROS);
+		GigRules.dates(start, end, now, properties.maxMonthsAhead(), properties.maxLengthDays());
+		GigRules.Budget budget = GigRules.budget(d.budgetMin(), d.budgetMax());
+		Long min = budget == null ? null : budget.min();
+		Long max = budget == null ? null : budget.max();
+
+		boolean hasPlace = d.localityId() != null || d.lat() != null || d.lng() != null;
+		if (d.workMode() == WorkMode.REMOTE) {
+			if (hasPlace || d.taOffered() != null) {
+				throw new InvalidGigException("A remote gig has no location and no travel allowance.");
+			}
+			return new GigFields(category.id(), d.specialisationId(), language, title, description, start, end,
+					WorkMode.REMOTE, null, null, null, null, null, null, null, min, max);
+		}
+		if (d.taOffered() == null) {
+			throw new InvalidGigException("Say whether travel allowance is offered for an on-site gig.");
+		}
+		ResolvedLocation place;
+		try {
+			place = locations.resolve(d.localityId(), d.lat(), d.lng());
+		}
+		catch (InvalidLocationException e) {
+			throw new InvalidGigException(e.getMessage());
+		}
+		return new GigFields(category.id(), d.specialisationId(), language, title, description, start, end,
+				WorkMode.ON_SITE, place.lat(), place.lng(), place.cityId(), place.zoneId(), place.label(),
+				place.localityId(), d.taOffered(), min, max);
+	}
+
+}

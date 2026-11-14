@@ -36,14 +36,19 @@ gigwork:
       idle-timeout: 7d
       absolute-timeout: 30d
 
+  jobs:
+    enabled: true   # ADR-0010: false turns every scheduled job off (tests call the job methods directly)
+
+  reference:
+    location:
+      max-distance-from-zone-km: 50   # FR-5: a map point (of a profile or a gig) farther than this from the nearest live zone is rejected
+      label-radius-meters: 2000       # a map point is labelled with the nearest locality within this distance
+
   profile:
     # Talent profile limits (FR-4 to FR-6); these are also the defaults
     max-categories: 5
     max-specialisations: 10
     max-links: 10
-    location:
-      max-distance-from-zone-km: 50   # a map point farther than this from the nearest live zone is rejected (FR-5)
-      label-radius-meters: 2000       # a map point is labelled with the nearest locality within this distance
     portfolio:
       blocked-hosts: [bit.ly, tinyurl.com, t.co, goo.gl, rb.gy, cutt.ly, is.gd]   # URL shorteners (FR-6)
 

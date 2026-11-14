@@ -85,8 +85,10 @@ Busy blocks and bookings are separate because they follow different rules: booki
 
 | Entity | Key fields |
 | --- | --- |
-| Gig | ID, Poster account ID, category ID, specialisation ID (optional), language code (optional), title, description, start, end, work mode (on-site / remote), location point, city ID, zone ID, locality name, TA offered, budget minimum, budget maximum, status, published at, closed at, close reason, outcome, gig group ID |
+| Gig | ID, Poster account ID, category ID, specialisation ID (optional), language code (optional), title, description, start, end, work mode (on-site / remote), location point, city ID, zone ID, locality name, locality ID (optional), TA offered, budget minimum, budget maximum, status, published at, updated at, closed at, close reason, outcome, gig group ID |
 | Gig group | ID, Poster account ID, source (form / AI), AI drafting session ID, created at |
+
+The gig group, and the gig's group ID, are added together with AI drafting (slice 9); until then a gig stands alone.
 
 **Lifecycle:** OPEN → FILLED (confirmed hire) or CANCELLED (by the Poster) or EXPIRED (start passed); FILLED → OPEN (hire cancelled before the start) or CANCELLED (Poster cancels; the hire is cancelled too). A filled gig can't be edited.
 
@@ -154,7 +156,7 @@ Owns almost no data: Phase 1 reads open gigs directly from Gigs. Phase 3 may add
 | Entity | Key fields | Access pattern |
 | --- | --- | --- |
 | Outbox event | ID, type, key, payload, created at, sent at | Inserted in every business transaction; relay reads unsent rows oldest first every \~1 s; sent rows cleaned up after a few days |
-| Scheduled action | ID, type, target ID, due at, status | Read due and pending rows every minute with row locking |
+| Job lock (ShedLock) | name, lock until, locked at, locked by | One row per periodic job; makes one core instance run the job per tick. Not what makes a job correct: each job is a conditional sweep of its own module's rows (ADR-0010), so there is no table of scheduled actions |
 | Feature flag | key, default, per-city overrides, updated by, updated at | Read constantly (cached); changes apply within 1 minute |
 | Audit log entry | ID, actor, action, target, old and new value, at | Append only; kept 1 year |
 | Rate-limit counter | key (user, IP or phone hash plus time window), count | Incremented on every request; expires within minutes |
@@ -173,7 +175,7 @@ The access patterns fall into four distinct shapes, which are the input for the 
 
 | Shape | Where | Needs |
 | --- | --- | --- |
-| 1. Relational and transactional | Identity, Talent Profile, Availability, Gigs, Hiring, Platform (outbox, scheduled actions) | Multi-entity transactions, uniqueness, no-overlap constraints, conditional updates, joins |
+| 1. Relational and transactional | Identity, Talent Profile, Availability, Gigs, Hiring, Platform (outbox, job lock) | Multi-entity transactions, uniqueness, no-overlap constraints, conditional updates, joins |
 | 2. Geographic | Talent Profile and Gigs (zone lookup, distance), the worker's match copy | Within-radius queries, point-in-zone, nearest zone |
 | 3. Huge, append-only, expiring | The notification inbox | Hundreds of millions of rows, burst writes, reads by recipient only, deletion by age |
 | 4. Tiny, hot, short-lived | Rate-limit counters, caches | Very fast increments with automatic expiry |
