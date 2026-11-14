@@ -72,7 +72,7 @@ def test_outlier_far_from_the_median_of_its_pin_is_dropped():
                OF("560004", "Basavanagudi-ish wrong", 12.97, 77.65)]  # ~7 km east of the others
     kept, out, single = pins.find_outliers(offices, 4_000)
     assert [o["office"] for o in out] == ["Basavanagudi-ish wrong"] and len(kept) == 3 and single == set()
-    assert 4_000 < out[0]["dist_m"] < 10_000 and not out[0]["pair"]
+    assert 4_000 < out[0]["dist_m"] < 10_000
 
 
 def test_close_offices_are_all_kept_and_threshold_is_configurable():
@@ -81,16 +81,17 @@ def test_close_offices_are_all_kept_and_threshold_is_configurable():
     assert len(pins.find_outliers(offices, 100)[1]) >= 1
 
 
-def test_single_office_pin_is_unverifiable_not_dropped():
-    kept, out, single = pins.find_outliers([OF("560009", "lonely", 12.9, 77.6)], 4_000)
-    assert len(kept) == 1 and out == [] and single == {"560009"}
+def test_one_and_two_office_pins_are_never_filtered_but_listed_as_unverifiable():
+    one = [OF("560009", "lonely", 12.9, 77.6)]
+    two = [OF("560017", "N", 12.95, 77.57), OF("560017", "V", 13.5, 77.57)]  # 60 km apart
+    kept, out, unver = pins.find_outliers(one + two, 4_000)
+    assert len(kept) == 3 and out == [] and unver == {"560009", "560017"}
 
 
-def test_two_far_apart_offices_are_both_dropped_as_a_pair():
-    kept, out, _ = pins.find_outliers([OF("560017", "N", 12.95, 77.57), OF("560017", "V", 13.5, 77.57)], 4_000)
-    assert kept == [] and [o["pair"] for o in out] == [True, True]
-    kept, out, _ = pins.find_outliers([OF("560017", "N", 12.95, 77.57), OF("560017", "V", 12.96, 77.57)], 4_000)
-    assert len(kept) == 2 and out == []
+def test_three_offices_is_enough_for_a_median():
+    offices = [OF("560004", "a", 12.95, 77.57), OF("560004", "b", 12.951, 77.571), OF("560004", "far", 13.5, 77.57)]
+    kept, out, unver = pins.find_outliers(offices, 4_000)
+    assert [o["office"] for o in out] == ["far"] and len(kept) == 2 and unver == set()
 
 
 def test_outlier_is_judged_against_all_offices_of_the_pin_even_outside_the_region(tmp_path):

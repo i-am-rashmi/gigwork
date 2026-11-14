@@ -30,7 +30,7 @@ class OfficeCounts:
     bad_pin: int = 0
     shared_point: int = 0  # offices stacked on one exact point with 3+ other PINs (geocoder default)
     outliers: int = 0  # valid coordinates and PIN, but far from the rest of that PIN's offices (all India)
-    single_office_pins: int = 0
+    unverifiable_pins: int = 0  # PINs with 1-2 offices: never filtered, cannot be cross-checked
     out_of_region: int = 0
     wrong_prefix: int = 0  # valid coordinates in the region, but a PIN that belongs to another area (bad geocode)
     prefixes: tuple = ()
@@ -64,26 +64,28 @@ def drop_shared_points(offices: list[dict], min_pins: int = 3, decimals: int = 4
     return kept, dropped
 
 
+MIN_OFFICES_FOR_MEDIAN = 3
+
+
 def find_outliers(offices: list[dict], max_m: float):
     """Offices located more than `max_m` from the median location of their PIN's offices.
 
     India Post has offices whose coordinates are wrong but whose PIN is valid (a Bengaluru office geocoded
     to another town), so a PIN's own offices vote on where it is: the median of their latitudes and of their
-    longitudes. Needs 2+ offices; single-office PINs cannot be checked and are returned as `single_pins`.
+    longitudes. A median only means something with 3+ offices. PINs with one or two offices are never filtered
+    (with two, the midpoint is equally far from both, so neither can be called the wrong one); they are returned
+    as `unverifiable`.
 
-    With exactly two offices the median is their midpoint, so both are the same distance from it and we cannot
-    tell which one is wrong: if they are more than 2 x `max_m` apart, both are dropped (and `pair` is True).
-
-    Returns (kept, outliers, single_pins). Each outlier is the office dict plus dist_m, n_offices, pair.
+    Returns (kept, outliers, unverifiable_pins). Each outlier is the office dict plus dist_m and n_offices.
     """
     by_pin: dict[str, list[dict]] = {}
     for o in offices:
         by_pin.setdefault(o["pin"], []).append(o)
-    kept, outliers, single = [], [], set()
+    kept, outliers, unverifiable = [], [], set()
     for pin in sorted(by_pin):
         group = by_pin[pin]
-        if len(group) == 1:
-            single.add(pin)
+        if len(group) < MIN_OFFICES_FOR_MEDIAN:
+            unverifiable.add(pin)
             kept.extend(group)
             continue
         mlat = statistics.median(o["lat"] for o in group)
@@ -91,10 +93,10 @@ def find_outliers(offices: list[dict], max_m: float):
         for o in group:
             d = haversine_m(o["lat"], o["lon"], mlat, mlon)
             if d > max_m:
-                outliers.append({**o, "dist_m": d, "n_offices": len(group), "pair": len(group) == 2})
+                outliers.append({**o, "dist_m": d, "n_offices": len(group)})
             else:
                 kept.append(o)
-    return kept, outliers, single
+    return kept, outliers, unverifiable
 
 
 def read_offices(csv_path: Path):
@@ -127,21 +129,21 @@ def load_offices(csv_path: Path, bbox: tuple[float, float, float, float], margin
     Order: valid coordinates and PIN -> drop offices stacked on one point -> drop per-PIN location outliers (judged against all of the PIN's
     offices, wherever they are) -> keep those inside `bbox` ± margin. bbox = (min_lon, min_lat, max_lon, max_lat).
     Every drop is counted by reason. `info` has the outliers inside the region, the total outlier count, and
-    the set of single-office PINs.
+    the set of unverifiable (1-2 office) PINs.
     """
     valid, c = read_offices(csv_path)
     valid, shared = drop_shared_points(valid, shared_point_pins)
     c.shared_point = len(shared)
     kept, outliers, single = find_outliers(valid, outlier_m)
     c.outliers = len(outliers)
-    c.single_office_pins = len(single)
+    c.unverifiable_pins = len(single)
     cand = [o for o in kept if in_region(o, bbox, margin_deg)]
     c.out_of_region = len(kept) - len(cand)
     c.kept = len(cand)
     info = {
         "outliers": sorted((o for o in outliers if in_region(o, bbox, margin_deg)), key=lambda o: (o["pin"], o["office"])),
         "shared": sorted((o for o in shared if in_region(o, bbox, margin_deg)), key=lambda o: (o["pin"], o["office"])),
-        "single_pins": single,
+        "unverifiable_pins": single,
     }
     return cand, c, info
 

@@ -92,20 +92,19 @@ def build_report(ctx: dict) -> str:
         L += [f"| {o['office']} | {o['pin']} | {o['shared_pins']} |" for o in info["shared"]]
     else:
         L.append("None.")
-    L += ["", "### Post-office location outliers (inside the region, allowed prefixes)", ""]
+    L += ["", "### Post-office location outliers (PINs with 3+ offices; inside the region, allowed prefixes)", ""]
     if info["outliers"]:
-        L += ["| Office | PIN | Offices with this PIN | Distance from median (km) | Note |", "|---|---|---:|---:|---|"]
+        L += ["| Office | PIN | Offices with this PIN | Distance from median (km) |", "|---|---|---:|---:|"]
         for o in info["outliers"]:
-            note = "pair: cannot tell which is wrong, both dropped" if o["pair"] else ""
-            L.append(f"| {o['office']} | {o['pin']} | {o['n_offices']} | {o['dist_m'] / 1000:.1f} | {note} |")
+            L.append(f"| {o['office']} | {o['pin']} | {o['n_offices']} | {o['dist_m'] / 1000:.1f} |")
     else:
         L.append("None.")
-    L += ["", "### Unverifiable: PINs with a single office (their location cannot be cross-checked)", ""]
-    singles = sorted(ctx["single_offices"], key=lambda o: (o["pin"], o["office"]))
+    L += ["", "### Unverifiable: PINs with 1-2 offices (never filtered; their location cannot be cross-checked)", ""]
+    singles = sorted(ctx["unverifiable_offices"], key=lambda o: (o["pin"], o["office"]))
     L += ([f"- {o['pin']}: {o['office']}" for o in singles] or ["None."])
     rows = ctx["localities"]
     single_pins = {o["pin"] for o in singles}
-    L += ["", f"Localities whose PIN came from a single-office PIN: {sum(1 for r in rows if r.get('pin_source') == 'auto' and r['pin'] in single_pins):,}"]
+    L += ["", f"Localities whose PIN came from a 1-2 office PIN: {sum(1 for r in rows if r.get('pin_source') == 'auto' and r['pin'] in single_pins):,}"]
     with_pin = [r for r in rows if r["pin"]]
     auto_pin = [r for r in with_pin if r.get("pin_source") == "auto"]
     L += ["", f"- Localities with a PIN: {len(with_pin):,} / {len(rows):,}",

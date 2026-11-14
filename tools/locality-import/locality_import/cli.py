@@ -97,7 +97,7 @@ def run(args, fetcher=places.fetch_overpass) -> dict:
     office_counts.prefixes, office_counts.kept = prefixes, len(offices)
     office_info["outliers"] = [o for o in office_info["outliers"] if o["pin"].startswith(prefixes)]
     office_info["shared"] = [o for o in office_info["shared"] if o["pin"].startswith(prefixes)]
-    single_offices = [o for o in offices if o["pin"] in office_info["single_pins"]]
+    unverifiable_offices = [o for o in offices if o["pin"] in office_info["unverifiable_pins"]]
     for o in offices:
         o["x"], o["y"] = lonlat_to_xy(o["lon"], o["lat"], crs)
     assigned = pins.assign_pins(merged, offices, args.max_pin_m)
@@ -123,7 +123,7 @@ def run(args, fetcher=places.fetch_overpass) -> dict:
         "n_named": len(named_all), "n_after_generic": len(named), "n_final": len(merged), "groups": groups,
         "prefix_source": prefix_source, "prefixed": prefixed, "generic_dropped": generic_dropped,
         "ov_applied": ov_applied,
-        "office_counts": office_counts, "office_info": office_info, "single_offices": single_offices, "localities": rows,
+        "office_counts": office_counts, "office_info": office_info, "unverifiable_offices": unverifiable_offices, "localities": rows,
     }
     review_dir.mkdir(parents=True, exist_ok=True)
     review.write_prefixed_csv(prefixed, review_dir / "prefixed.csv")
