@@ -36,6 +36,9 @@ gigwork:
       idle-timeout: 7d
       absolute-timeout: 30d
 
+  jobs:
+    enabled: true   # ADR-0010: false turns every scheduled job off (tests call the job methods directly)
+
   reference:
     location:
       max-distance-from-zone-km: 50   # a gig's map point farther than this from the nearest live zone is rejected

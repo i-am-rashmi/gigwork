@@ -1,5 +1,7 @@
 # Used by all tests (the surefire configuration activates the 'test' profile). Fake keys, see DevConfigurationGuard.
 gigwork:
+  jobs:
+    enabled: false   # tests call the job methods directly (ADR-0010)
   identity:
     mobile-hash-key: dev-only-not-a-secret-test-mobile-hash-key
     otp-hash-key: dev-only-not-a-secret-test-otp-hash-key
