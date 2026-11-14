@@ -32,18 +32,18 @@ The logical data model per component: entities, access patterns, guarantees and 
 
 | Entity | Key fields |
 | --- | --- |
-| Talent profile | account ID (one per account), profile type (individual / group), member count, headline, bio, home location (coordinates), city ID, zone ID, locality name, service radius (1–50 km), willing to travel, status (active / hidden), updated at |
+| Talent profile | account ID (one per account), profile type (individual / group), member count, headline, bio, home location (coordinates; rounded to 3 decimals when it comes from a map point), city ID, zone ID, location label (locality or zone name), locality ID (when chosen from the list), service radius (1–50 km), willing to travel, hidden flag, status (incomplete / active / hidden), created at, updated at |
 | Talent category | account ID, category ID (up to 5) |
 | Talent specialisation | account ID, specialisation ID (up to 10 in total) |
 | Talent language | account ID, language code (optional) |
-| Portfolio link | ID, account ID, URL, type, display order |
+| Portfolio link | ID, account ID, URL, type (derived by the server from the host), display order |
 | Preferred zone | account ID, zone ID (default browse filter only) |
 
 Name and contact details live in Identity. A home location outside every zone is assigned the nearest city and zone for browsing; matching uses the actual coordinates.
 
 **Access patterns:** read a profile by account ID; read many profiles by a list of IDs (applicant review); check "does Talent X have category Y" (applying) and, for a gig with a specialisation, "does Talent X have specialisation Z"; in Phase 3, filter by category and zone and sort by distance. Matching never reads here; it uses its own copy.
 
-**Guarantees:** at most 5 categories and at most 10 specialisations even under concurrent edits; categories, specialisations and languages must be live; every specialisation belongs to one of the Talent's categories (removing a category removes its specialisations); one profile per account.
+**Guarantees:** at most 5 categories and at most 10 specialisations even under concurrent edits; categories, specialisations and languages must be live; every specialisation belongs to one of the Talent's categories (removing a category removes its specialisations); one profile per account, and only for an account that has a first name (checked when the work section is saved); the profile is saved in three sections (work, location, portfolio), each replaced as a whole under a lock on the profile row, so concurrent saves never mix; the status is incomplete until work and location are saved, then active, and hidden while the Talent has hidden it (a database check refuses active without both).
 
 **Volume:** 50,000 profiles per city; under a million rows in total.
 
