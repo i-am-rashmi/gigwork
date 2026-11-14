@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import math
 import re
+import statistics
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,19 +28,77 @@ class OfficeCounts:
     total: int = 0
     bad_coords: int = 0  # missing, NA, zero or not a number, or lat/lon out of range
     bad_pin: int = 0
+    shared_point: int = 0  # offices stacked on one exact point with 3+ other PINs (geocoder default)
+    outliers: int = 0  # valid coordinates and PIN, but far from the rest of that PIN's offices (all India)
+    single_office_pins: int = 0
     out_of_region: int = 0
     wrong_prefix: int = 0  # valid coordinates in the region, but a PIN that belongs to another area (bad geocode)
     prefixes: tuple = ()
     kept: int = 0
 
 
-def load_offices(csv_path: Path, bbox: tuple[float, float, float, float], margin_deg: float):
-    """Read the India Post directory; keep offices with valid coordinates inside `bbox` ± margin.
+def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    p = math.pi / 180
+    h = math.sin((lat2 - lat1) * p / 2) ** 2 + math.cos(lat1 * p) * math.cos(lat2 * p) * math.sin((lon2 - lon1) * p / 2) ** 2
+    return 2 * 6_371_000 * math.asin(math.sqrt(h))
 
-    bbox = (min_lon, min_lat, max_lon, max_lat). Returns (offices, counts); each office is a dict with
-    pin, office, lat, lon. Dropped rows are counted by reason, never silently.
+
+def drop_shared_points(offices: list[dict], min_pins: int = 3, decimals: int = 4):
+    """Drop offices whose coordinates (rounded to `decimals`, ~11 m) are shared with offices of `min_pins`+ different PINs.
+
+    Several unrelated offices at one exact point is a geocoder's fallback location (all the 'Bengaluru' offices
+    landing on one spot in Basavanagudi), not where they are. Two PINs at one point can be real, so the default
+    needs three. Returns (kept, dropped); dropped offices carry `shared_pins`.
     """
-    w, s, e, n = bbox
+    cells: dict[tuple, list[dict]] = {}
+    for o in offices:
+        cells.setdefault((round(o["lat"], decimals), round(o["lon"], decimals)), []).append(o)
+    kept, dropped = [], []
+    for key in sorted(cells):
+        group = cells[key]
+        n = len({o["pin"] for o in group})
+        if n >= min_pins:
+            dropped.extend({**o, "shared_pins": n} for o in group)
+        else:
+            kept.extend(group)
+    return kept, dropped
+
+
+def find_outliers(offices: list[dict], max_m: float):
+    """Offices located more than `max_m` from the median location of their PIN's offices.
+
+    India Post has offices whose coordinates are wrong but whose PIN is valid (a Bengaluru office geocoded
+    to another town), so a PIN's own offices vote on where it is: the median of their latitudes and of their
+    longitudes. Needs 2+ offices; single-office PINs cannot be checked and are returned as `single_pins`.
+
+    With exactly two offices the median is their midpoint, so both are the same distance from it and we cannot
+    tell which one is wrong: if they are more than 2 x `max_m` apart, both are dropped (and `pair` is True).
+
+    Returns (kept, outliers, single_pins). Each outlier is the office dict plus dist_m, n_offices, pair.
+    """
+    by_pin: dict[str, list[dict]] = {}
+    for o in offices:
+        by_pin.setdefault(o["pin"], []).append(o)
+    kept, outliers, single = [], [], set()
+    for pin in sorted(by_pin):
+        group = by_pin[pin]
+        if len(group) == 1:
+            single.add(pin)
+            kept.extend(group)
+            continue
+        mlat = statistics.median(o["lat"] for o in group)
+        mlon = statistics.median(o["lon"] for o in group)
+        for o in group:
+            d = haversine_m(o["lat"], o["lon"], mlat, mlon)
+            if d > max_m:
+                outliers.append({**o, "dist_m": d, "n_offices": len(group), "pair": len(group) == 2})
+            else:
+                kept.append(o)
+    return kept, outliers, single
+
+
+def read_offices(csv_path: Path):
+    """Every directory row with valid coordinates and a valid PIN, plus counts of what was dropped."""
     c = OfficeCounts()
     out = []
     with open(csv_path, newline="", encoding="utf-8") as f:
@@ -53,12 +112,38 @@ def load_offices(csv_path: Path, bbox: tuple[float, float, float, float], margin
             if not PIN_RE.match(pin):
                 c.bad_pin += 1
                 continue
-            if not (w - margin_deg <= lon <= e + margin_deg and s - margin_deg <= lat <= n + margin_deg):
-                c.out_of_region += 1
-                continue
             out.append({"pin": pin, "office": str(row.get("officename", "")).strip(), "lat": lat, "lon": lon})
-            c.kept += 1
     return out, c
+
+
+def in_region(o: dict, bbox: tuple[float, float, float, float], margin_deg: float) -> bool:
+    w, s, e, n = bbox
+    return w - margin_deg <= o["lon"] <= e + margin_deg and s - margin_deg <= o["lat"] <= n + margin_deg
+
+
+def load_offices(csv_path: Path, bbox: tuple[float, float, float, float], margin_deg: float, outlier_m: float = 4_000, shared_point_pins: int = 3):
+    """Read the India Post directory and return (candidate offices, counts, info).
+
+    Order: valid coordinates and PIN -> drop offices stacked on one point -> drop per-PIN location outliers (judged against all of the PIN's
+    offices, wherever they are) -> keep those inside `bbox` ± margin. bbox = (min_lon, min_lat, max_lon, max_lat).
+    Every drop is counted by reason. `info` has the outliers inside the region, the total outlier count, and
+    the set of single-office PINs.
+    """
+    valid, c = read_offices(csv_path)
+    valid, shared = drop_shared_points(valid, shared_point_pins)
+    c.shared_point = len(shared)
+    kept, outliers, single = find_outliers(valid, outlier_m)
+    c.outliers = len(outliers)
+    c.single_office_pins = len(single)
+    cand = [o for o in kept if in_region(o, bbox, margin_deg)]
+    c.out_of_region = len(kept) - len(cand)
+    c.kept = len(cand)
+    info = {
+        "outliers": sorted((o for o in outliers if in_region(o, bbox, margin_deg)), key=lambda o: (o["pin"], o["office"])),
+        "shared": sorted((o for o in shared if in_region(o, bbox, margin_deg)), key=lambda o: (o["pin"], o["office"])),
+        "single_pins": single,
+    }
+    return cand, c, info
 
 
 def assign_pins(places: list[dict], offices: list[dict], max_m: float) -> list[dict]:

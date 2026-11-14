@@ -81,9 +81,31 @@ def build_report(ctx: dict) -> str:
           f"- Dropped, invalid PIN: {c.bad_pin:,}",
           f"- Dropped, outside the region (zones bbox + margin): {c.out_of_region:,}",
           f"- Allowed PIN prefixes: {', '.join(c.prefixes)} (from {ctx['prefix_source']})",
+          f"- Dropped, stacked on one exact point with {ctx['params']['shared-point PINs']}+ different PINs (geocoder default location; all India): {c.shared_point:,}",
+          f"- Dropped, location outlier within its PIN (more than {ctx['params']['outlier distance (m)']:,.0f} m from the median of the PIN's offices; all India): {c.outliers:,}",
           f"- Dropped, PIN prefix not allowed (offices geocoded into the wrong city): {c.wrong_prefix:,}",
           f"- Offices used as candidates: {c.kept:,}"]
+    info = ctx["office_info"]
+    L += ["", "### Offices stacked on one exact point (inside the region, allowed prefixes)", ""]
+    if info["shared"]:
+        L += ["| Office | PIN | Different PINs at this point |", "|---|---|---:|"]
+        L += [f"| {o['office']} | {o['pin']} | {o['shared_pins']} |" for o in info["shared"]]
+    else:
+        L.append("None.")
+    L += ["", "### Post-office location outliers (inside the region, allowed prefixes)", ""]
+    if info["outliers"]:
+        L += ["| Office | PIN | Offices with this PIN | Distance from median (km) | Note |", "|---|---|---:|---:|---|"]
+        for o in info["outliers"]:
+            note = "pair: cannot tell which is wrong, both dropped" if o["pair"] else ""
+            L.append(f"| {o['office']} | {o['pin']} | {o['n_offices']} | {o['dist_m'] / 1000:.1f} | {note} |")
+    else:
+        L.append("None.")
+    L += ["", "### Unverifiable: PINs with a single office (their location cannot be cross-checked)", ""]
+    singles = sorted(ctx["single_offices"], key=lambda o: (o["pin"], o["office"]))
+    L += ([f"- {o['pin']}: {o['office']}" for o in singles] or ["None."])
     rows = ctx["localities"]
+    single_pins = {o["pin"] for o in singles}
+    L += ["", f"Localities whose PIN came from a single-office PIN: {sum(1 for r in rows if r.get('pin_source') == 'auto' and r['pin'] in single_pins):,}"]
     with_pin = [r for r in rows if r["pin"]]
     auto_pin = [r for r in with_pin if r.get("pin_source") == "auto"]
     L += ["", f"- Localities with a PIN: {len(with_pin):,} / {len(rows):,}",

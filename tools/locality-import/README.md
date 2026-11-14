@@ -35,14 +35,14 @@ python -m locality_import --city bengaluru \
   [--refresh-osm]
 ```
 
-Options (defaults in brackets): `--buffer-m` [500] keep places this far outside the zones; `--max-pin-m` [3000] farthest post office a PIN may come from; `--dedupe-m` [1000] merge same-named places this close; `--parent-m` [2000] radius for finding a parent area for generic names; `--pin-prefixes` overrides the city's configured PIN prefixes; `--simplify-m` [10] zone simplification tolerance; `--zone-name-field` [`NewCorp`]; `--expected-zones` [`Central,East,North,South,West`] the exact zone names the file must contain (the run stops if they differ; an empty value disables the check).
+Options (defaults in brackets): `--buffer-m` [500] keep places this far outside the zones; `--max-pin-m` [3000] farthest post office a PIN may come from; `--outlier-m` [4000] drop post offices farther than this from the median location of their PIN's offices; `--shared-point-pins` [3] drop offices stacked on one exact point with this many different PINs; `--dedupe-m` [1000] merge same-named places this close; `--parent-m` [2000] radius for finding a parent area for generic names; `--pin-prefixes` overrides the city's configured PIN prefixes; `--simplify-m` [10] zone simplification tolerance; `--zone-name-field` [`NewCorp`]; `--expected-zones` [`Central,East,North,South,West`] the exact zone names the file must contain (the run stops if they differ; an empty value disables the check).
 
 ## What it does
 
 1. **Zones**: one polygon per zone, clean name, EPSG:4326, invalid geometry repaired. Simplified in metres (the city's UTM zone) with a topology-preserving method, so shared edges stay shared and simplification creates no gaps or overlaps. Overlap (m², pairwise) and gaps (holes of the union of all zones, m² each) are reported before and after.
 2. **Places**: OSM `place=suburb|neighbourhood|quarter|village|town|hamlet` within the zones' bounding box, kept only if inside the union of zones plus the buffer.
 3. **Clean**: `name:en` over `name`, whitespace normalised, unnamed dropped. Generic names that mean nothing alone (`4th Block`, `Sector 2`, `Further Extension`, `3rd Cross`...) get a parent as prefix (`HSR Layout Sector 2`): a suburb within the parent radius is preferred over a nearer neighbourhood. Generic names of the same family (sector, phase, block...) within the radius of each other share the majority parent of their individual matches. With no parent in range the row is dropped. This is a heuristic: review `prefixed.csv` (every prefixed row). Then same name within the dedupe distance merged to the group's centroid. Every merge group is listed in the report (a chain A-B-C can merge even if A and C are farther apart than the threshold; the report shows the largest pairwise distance).
-4. **PIN**: nearest valid post office within the max distance, measured in metres in the projected CRS, among offices whose PIN starts with one of the city's prefixes (India Post has offices in other districts whose coordinates fall inside the city). No match: empty PIN, listed in the report. Then manual overrides are applied and listed.
+4. **PIN**: nearest valid post office within the max distance, measured in metres in the projected CRS, among offices whose PIN starts with one of the city's prefixes (India Post has offices in other districts whose coordinates fall inside the city). Office coordinates are also sanity-checked first: offices stacked on one exact point with 3+ different PINs are a geocoder default and are dropped; for PINs with 2+ offices, offices more than 4 km from the median location of the PIN's offices are dropped (with exactly two offices that disagree, both go, because we cannot tell which is wrong). Dropped offices and single-office PINs (which cannot be cross-checked) are listed in the report. Large rural PINs legitimately spread over more than 4 km, so check the list before trusting it for a new city. No match: empty PIN, listed in the report. Then manual overrides are applied and listed.
 5. **Output**: deterministic (same inputs give byte-identical files).
 
 ## Per-city configuration (committed): `config/<city>/`
@@ -56,7 +56,7 @@ Options (defaults in brackets): `--buffer-m` [500] keep places this far outside 
 
 Committed, in `infra/seed/<city>/`:
 
-- `zones.geojson`: simplified zones, properties: `name` only.
+- `zones.geojson`: simplified zones, properties: `name` only. One coordinate pair per line, so a boundary change is a reviewable diff.
 - `localities.csv`: `source_id,name,pin,lat,lng`; `source_id` is the stable key (smallest OSM id among the merged places, e.g. `node/123`; unique, the run fails otherwise); lat/lng with 6 decimals, sorted by name. `pin` may be empty.
 
 Review only, in `tools/locality-import/output/<city>/`: `report.md`, `map.html` and `prefixed.csv`.

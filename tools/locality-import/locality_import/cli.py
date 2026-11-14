@@ -35,6 +35,10 @@ def parse_args(argv=None):
                         "Default if neither is set: the most common 3-digit prefix among offices in the region")
     p.add_argument("--parent-m", type=float, default=2000, help="radius to find a parent area for generic names like '4th Block'")
     p.add_argument("--config-dir", type=Path, default=None, help="default: tools/locality-import/config/<city>")
+    p.add_argument("--outlier-m", type=float, default=4000,
+                   help="drop post offices farther than this from the median location of their PIN's offices")
+    p.add_argument("--shared-point-pins", type=int, default=3,
+                   help="drop post offices stacked on one exact point with this many different PINs (geocoder default)")
     p.add_argument("--dedupe-m", type=float, default=1000, help="merge same-named places within this distance")
     p.add_argument("--simplify-m", type=float, default=10, help="zone simplification tolerance in metres")
     p.add_argument("--seed-dir", type=Path, default=None, help="default: <repo>/infra/seed/<city>")
@@ -79,7 +83,7 @@ def run(args, fetcher=places.fetch_overpass) -> dict:
 
     # 4. PINs from valid post offices near the region.
     margin_deg = (args.buffer_m + args.max_pin_m) / 111_000 * 1.5
-    offices, office_counts = pins.load_offices(args.pins, (w, s, e, n), margin_deg)
+    offices, office_counts, office_info = pins.load_offices(args.pins, (w, s, e, n), margin_deg, args.outlier_m, args.shared_point_pins)
     cfg_dir = args.config_dir or TOOL_DIR / "config" / args.city
     settings = config.load_settings(cfg_dir)
     cli_prefixes = tuple(x.strip() for x in args.pin_prefixes.split(",") if x.strip())
@@ -91,6 +95,9 @@ def run(args, fetcher=places.fetch_overpass) -> dict:
         prefixes, prefix_source = (pins.modal_prefix(offices),), "most common prefix in the region (no config)"
     offices, office_counts.wrong_prefix = pins.filter_by_prefix(offices, prefixes)
     office_counts.prefixes, office_counts.kept = prefixes, len(offices)
+    office_info["outliers"] = [o for o in office_info["outliers"] if o["pin"].startswith(prefixes)]
+    office_info["shared"] = [o for o in office_info["shared"] if o["pin"].startswith(prefixes)]
+    single_offices = [o for o in offices if o["pin"] in office_info["single_pins"]]
     for o in offices:
         o["x"], o["y"] = lonlat_to_xy(o["lon"], o["lat"], crs)
     assigned = pins.assign_pins(merged, offices, args.max_pin_m)
@@ -104,7 +111,7 @@ def run(args, fetcher=places.fetch_overpass) -> dict:
     output.write_zones_geojson(out_zones, seed_dir / "zones.geojson")
     output.write_localities_csv(rows, seed_dir / "localities.csv")
     params = {
-        "buffer (m)": args.buffer_m, "max PIN distance (m)": args.max_pin_m, "dedupe distance (m)": args.dedupe_m, "parent radius (m)": args.parent_m,
+        "buffer (m)": args.buffer_m, "max PIN distance (m)": args.max_pin_m, "outlier distance (m)": args.outlier_m, "shared-point PINs": args.shared_point_pins, "dedupe distance (m)": args.dedupe_m, "parent radius (m)": args.parent_m,
         "simplify tolerance (m)": args.simplify_m, "metric CRS": f"EPSG:{crs.to_epsg()}",
         "zones file": args.zones.name, "pin file": args.pins.name,
     }
@@ -116,7 +123,7 @@ def run(args, fetcher=places.fetch_overpass) -> dict:
         "n_named": len(named_all), "n_after_generic": len(named), "n_final": len(merged), "groups": groups,
         "prefix_source": prefix_source, "prefixed": prefixed, "generic_dropped": generic_dropped,
         "ov_applied": ov_applied,
-        "office_counts": office_counts, "localities": rows,
+        "office_counts": office_counts, "office_info": office_info, "single_offices": single_offices, "localities": rows,
     }
     review_dir.mkdir(parents=True, exist_ok=True)
     review.write_prefixed_csv(prefixed, review_dir / "prefixed.csv")

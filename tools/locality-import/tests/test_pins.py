@@ -41,9 +41,9 @@ def test_load_offices_discards_invalid_and_out_of_region(tmp_path):
         + 'c,r,d,"Swapped B.O",560004,BO,Delivery,D,KARNATAKA,77.59,12.97\n',
         encoding="utf-8",
     )
-    offices, c = pins.load_offices(f, (77.4, 12.8, 77.8, 13.2), 0.05)
+    offices, c, _ = pins.load_offices(f, (77.4, 12.8, 77.8, 13.2), 0.05)
     assert [o["pin"] for o in offices] == ["560001"]
-    assert (c.total, c.bad_coords, c.bad_pin, c.out_of_region, c.kept) == (6, 2, 1, 2, 1)
+    assert (c.total, c.bad_coords, c.bad_pin, c.out_of_region, c.kept) == (6, 2, 1, 2, 1) and c.outliers == 0
 
 
 def test_filter_by_prefix_drops_offices_geocoded_from_elsewhere():
@@ -61,3 +61,58 @@ def test_modal_prefix():
     assert pins.modal_prefix([O("560001", "a", 0, 0), O("560002", "b", 0, 0), O("577001", "c", 0, 0)]) == "560"
     assert pins.modal_prefix([]) == ""
 
+
+
+def OF(pin, name, lat, lon):
+    return {"pin": pin, "office": name, "lat": lat, "lon": lon}
+
+
+def test_outlier_far_from_the_median_of_its_pin_is_dropped():
+    offices = [OF("560004", "a", 12.95, 77.57), OF("560004", "b", 12.96, 77.58), OF("560004", "c", 12.95, 77.58),
+               OF("560004", "Basavanagudi-ish wrong", 12.97, 77.65)]  # ~7 km east of the others
+    kept, out, single = pins.find_outliers(offices, 4_000)
+    assert [o["office"] for o in out] == ["Basavanagudi-ish wrong"] and len(kept) == 3 and single == set()
+    assert 4_000 < out[0]["dist_m"] < 10_000 and not out[0]["pair"]
+
+
+def test_close_offices_are_all_kept_and_threshold_is_configurable():
+    offices = [OF("560001", "a", 12.95, 77.57), OF("560001", "b", 12.96, 77.58), OF("560001", "c", 12.955, 77.575)]
+    assert pins.find_outliers(offices, 4_000)[1] == []
+    assert len(pins.find_outliers(offices, 100)[1]) >= 1
+
+
+def test_single_office_pin_is_unverifiable_not_dropped():
+    kept, out, single = pins.find_outliers([OF("560009", "lonely", 12.9, 77.6)], 4_000)
+    assert len(kept) == 1 and out == [] and single == {"560009"}
+
+
+def test_two_far_apart_offices_are_both_dropped_as_a_pair():
+    kept, out, _ = pins.find_outliers([OF("560017", "N", 12.95, 77.57), OF("560017", "V", 13.5, 77.57)], 4_000)
+    assert kept == [] and [o["pair"] for o in out] == [True, True]
+    kept, out, _ = pins.find_outliers([OF("560017", "N", 12.95, 77.57), OF("560017", "V", 12.96, 77.57)], 4_000)
+    assert len(kept) == 2 and out == []
+
+
+def test_outlier_is_judged_against_all_offices_of_the_pin_even_outside_the_region(tmp_path):
+    f = tmp_path / "p.csv"
+    f.write_text(HEADER + "".join(
+        f'c,r,d,"{n}",560004,BO,Delivery,D,KARNATAKA,{la},{lo}\n'
+        for n, la, lo in [("a", 12.95, 77.57), ("b", 12.96, 77.58), ("c", 12.95, 77.58), ("wrong", 12.97, 77.65)]), encoding="utf-8")
+    offices, c, info = pins.load_offices(f, (77.4, 12.8, 77.8, 13.2), 0.05)
+    assert sorted(o["office"] for o in offices) == ["a", "b", "c"] and c.outliers == 1
+    assert [o["office"] for o in info["outliers"]] == ["wrong"]
+
+
+def test_offices_stacked_on_one_point_with_three_pins_are_dropped():
+    pt = (12.9447, 77.574)
+    offices = [OF("560017", "Vimanapura", *pt), OF("560043", "Kalyananagar", *pt), OF("560038", "Indiranagar", *pt),
+               OF("560004", "Basavanagudi H.O", 12.9454, 77.5735), OF("560001", "MG Road", 12.97, 77.6)]
+    kept, dropped = pins.drop_shared_points(offices)
+    assert sorted(o["office"] for o in dropped) == ["Indiranagar", "Kalyananagar", "Vimanapura"] and dropped[0]["shared_pins"] == 3
+    assert sorted(o["office"] for o in kept) == ["Basavanagudi H.O", "MG Road"]
+
+
+def test_two_pins_at_one_point_and_many_offices_of_one_pin_are_kept():
+    a = [OF("560032", "R T Nagar", 13.0216, 77.5928), OF("560006", "J C Nagar", 13.0216, 77.5928)]
+    b = [OF("560001", "x", 12.9, 77.5), OF("560001", "y", 12.9, 77.5), OF("560001", "z", 12.9, 77.5)]
+    assert pins.drop_shared_points(a + b)[1] == []
