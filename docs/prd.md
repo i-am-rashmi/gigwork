@@ -34,22 +34,23 @@ Creative and artistic talent and the people who want to hire them find each othe
 
 ### Accounts and contact
 
-- **FR-1** A visitor can sign up and log in using either their mobile number or their email address, with a one-time code (OTP). One account can both post gigs and register as Talent.
+- **FR-1** A visitor can sign up and log in using either their mobile number or their email address, with a one-time code (OTP). One account can both post gigs and register as Talent. A user can set a first name, which other logged-in users see.
 - **FR-2** Each user chooses one or more contact methods they are willing to share (WhatsApp, phone call, email).
 - **FR-3** Every registered user verifies a mobile number by OTP when signing up, whether they act as Poster, Talent or both. An email address is verified later, by OTP while the user is logged in, the first time it is needed. The system records whether each mobile number and email address is verified. Login by email OTP and email notifications work only for a verified email address. Talent are prompted to verify their email so they can also receive gig notifications by email. Until a frontend or mobile app exists, notifications go to the in-app inbox and, where verified, email; push notifications come with the app.
 - **FR-3a** A user can delete their own account after a fresh OTP. Immediately, their sessions end, their profile is hidden, their open gigs and applications are cancelled or withdrawn, contact reveals end, and any upcoming confirmed hires are cancelled with the other side notified. For 30 days, logging in again offers to restore the account (cancelled gigs and hires stay cancelled). After 30 days, personal data is erased; gigs and applications they took part in are kept in anonymised form.
 
 ### Talent profile
 
-- **FR-4** A user can register as Talent by choosing one or more categories from a fixed, pre-decided list. A Talent can hold up to 5 categories (a configurable limit). Each category has a fixed list of specialisations (a second level, for example a photographer's wedding or food work); a Talent can also choose specialisations, up to 10 in total (a configurable limit), and each must belong to one of the Talent's categories. A Talent can optionally list the languages they perform or work in, from a fixed list. In Phase 1 there is no way to add categories, specialisations or languages from the app.
-- **FR-5** Talent set a home location (by locality, PIN code or map pin; stored as coordinates, never as a street address), a service radius of 1–50 km, and a willing-to-travel flag. A home location outside every zone is assigned the nearest city and zone for browsing; matching uses the actual location. A profile is marked as an individual or a group (with an optional member count).
-- **FR-6** Talent add portfolio links (website, Instagram and others).
+- **FR-4** A user can register as Talent by choosing one or more categories from a fixed, pre-decided list. A Talent can hold up to 5 categories (a configurable limit). Each category has a fixed list of specialisations (a second level, for example a photographer's wedding or food work); a Talent can also choose specialisations, up to 10 in total (a configurable limit), and each must belong to one of the Talent's categories. A Talent can optionally list the languages they perform or work in, from a fixed list. In Phase 1 there is no way to add categories, specialisations or languages from the app. A Talent must have a first name (FR-1) before saving the work section. A Talent saves the profile in three sections, each replaced as a whole when saved: work (individual or group with an optional member count, headline, bio, categories, specialisations, languages), location (FR-5) and portfolio (FR-6). The profile is incomplete until the work and location sections are both saved, and then becomes active automatically. A Talent can hide the profile, whether incomplete or active, and unhide it later; only active profiles are found by others.
+- **FR-5** Talent set a home location by choosing a locality from the reference list (found by name or PIN code) or a map point; it is stored as coordinates, never as a street address, and a map point is stored rounded to 3 decimals (about 110 m). A point more than 50 km (a configurable limit) from the nearest live zone is rejected. Talent also set a service radius of 1–50 km and a willing-to-travel flag. A home location outside every zone is assigned the nearest city and zone for browsing; matching uses the actual location. A profile is marked as an individual or a group (with an optional member count).
+- **FR-6** Talent add up to 10 portfolio links (website, Instagram and others), shown in the order given. The server derives each link's type (website, Instagram, YouTube and so on) from its address and never fetches the address. URL shorteners and contact links (WhatsApp, Telegram, phone, email) are not accepted.
+- **FR-6a** A Talent's headline and bio, and any user's first name, may not contain phone numbers, email addresses or contact links: contact details are shared only through the reveal flow, so Posters reach Talent through GigWork.
 - **FR-7** Talent add and remove busy blocks (date-time ranges when they are unavailable; a block can be marked all-day).
-- **FR-8** Talent's exact location is stored but never shown to other users; only locality and city are shown. Search results also show a rounded distance, e.g. "\~4 km".
+- **FR-8** Talent's exact location is stored but never shown to other users; only locality and city are shown. Search results also show a rounded distance, e.g. "\~4 km". Visitors see a Talent's categories, specialisations, languages, headline, bio, profile type, member count, locality and city, and only the types of the portfolio links; logged-in users also see the first name and the portfolio links. Radius, willing-to-travel, status and contact details are never shown to others. A profile that is incomplete or hidden is not found (404) by anyone but its owner.
 
 ### Browse and search
 
-- **FR-9** Anyone, logged in or not, can browse open gigs and Talent profiles. Visitors who are not logged in never see anyone's contact details.
+- **FR-9** Anyone, logged in or not, can browse open gigs and Talent profiles. Visitors who are not logged in never see anyone's contact details. Profiles that are incomplete or hidden are not shown.
 - **FR-10** Browsing is filtered by one or more city zones. For a logged-in user, the default is their own zone. For a visitor, the city is detected from their IP address and all zones in that city are shown; they can then narrow to specific zones. Remote gigs appear regardless of the zones selected. A Talent can save preferred cities or zones as their default filter for browsing gigs; this does not affect notifications.
 - **FR-11** Results can be filtered by category and date; gig results also by budget.
 - **FR-12** Applying to a gig or seeing contact details requires an account.
@@ -177,7 +178,8 @@ Least privilege: each person sees the minimum they need for their next step. Eve
 
 | Data | Who can see it |
 | --- | --- |
-| Talent's public profile (name, categories, locality, portfolio links) | Everyone, including visitors |
+| Talent's public profile (categories, specialisations, languages, headline, bio, locality and city, portfolio link types) | Everyone, including visitors |
+| Talent's first name and portfolio links | Logged-in users |
 | Talent's exact location | No one; used only internally for matching |
 | Talent's contact details | A Poster who shortlisted them, only after the Talent accepts to reveal, and while they remain shortlisted |
 | Talent's busy blocks | Only the Talent |

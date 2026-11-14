@@ -94,7 +94,8 @@ class SeedMigrationFlywayTest {
 			JdbcTemplate jdbc = new JdbcTemplate(dataSource);
 			flyway(dataSource, new DirectorySeedFiles(seed)).migrate();
 
-			assertThat(jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version IS NOT NULL", Integer.class)).isEqualTo(5); // V1..V5
+			int sqlMigrations = jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version IS NOT NULL", Integer.class);
+			assertThat(sqlMigrations).isGreaterThanOrEqualTo(5); // the versioned SQL migrations, whatever their number
 			assertThat(applied(jdbc, REFERENCE)).isEqualTo(1);
 			assertThat(applied(jdbc, BENGALURU)).isEqualTo(1);
 
@@ -102,6 +103,7 @@ class SeedMigrationFlywayTest {
 			flyway(dataSource, new DirectorySeedFiles(seed)).validate();
 			assertThat(applied(jdbc, REFERENCE)).isEqualTo(1);
 			assertThat(applied(jdbc, BENGALURU)).isEqualTo(1);
+			assertThat(jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version IS NOT NULL", Integer.class)).isEqualTo(sqlMigrations);
 
 			// only line endings change (Git can do that): the hash must not
 			Path categories = seed.resolve("categories.csv");

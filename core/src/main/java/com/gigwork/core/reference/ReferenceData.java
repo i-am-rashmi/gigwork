@@ -34,6 +34,18 @@ public interface ReferenceData {
 	/** LIVE zones of a LIVE city by name; empty for an unknown or not-live city. */
 	List<ZoneInfo> zones(UUID cityId);
 
+	/** A LIVE city (of a live city), by id. */
+	Optional<CityInfo> city(UUID id);
+
+	/** A LIVE zone of a live city, by id. */
+	Optional<ZoneInfo> zone(UUID id);
+
+	/** A LIVE locality of a live city, by id. */
+	Optional<LocalityInfo> locality(UUID id);
+
+	/** The live locality whose centre is nearest to the point, if it is within {@code maxMeters}. */
+	Optional<LocalityInfo> nearestLocality(double lat, double lng, double maxMeters);
+
 	/**
 	 * The city and zone of a point: the zone covering it (lowest zone id on a shared border), else the nearest zone
 	 * of a live city.
