@@ -34,14 +34,16 @@ The logical data model per component: entities, access patterns, guarantees and 
 | --- | --- |
 | Talent profile | account ID (one per account), profile type (individual / group), member count, headline, bio, home location (coordinates), city ID, zone ID, locality name, service radius (1–50 km), willing to travel, status (active / hidden), updated at |
 | Talent category | account ID, category ID (up to 5) |
+| Talent specialisation | account ID, specialisation ID (up to 10 in total) |
+| Talent language | account ID, language code (optional) |
 | Portfolio link | ID, account ID, URL, type, display order |
 | Preferred zone | account ID, zone ID (default browse filter only) |
 
 Name and contact details live in Identity. A home location outside every zone is assigned the nearest city and zone for browsing; matching uses the actual coordinates.
 
-**Access patterns:** read a profile by account ID; read many profiles by a list of IDs (applicant review); check "does Talent X have category Y" (applying); in Phase 3, filter by category and zone and sort by distance. Matching never reads here; it uses its own copy.
+**Access patterns:** read a profile by account ID; read many profiles by a list of IDs (applicant review); check "does Talent X have category Y" (applying) and, for a gig with a specialisation, "does Talent X have specialisation Z"; in Phase 3, filter by category and zone and sort by distance. Matching never reads here; it uses its own copy.
 
-**Guarantees:** at most 5 categories even under concurrent edits; categories must be live; one profile per account.
+**Guarantees:** at most 5 categories and at most 10 specialisations even under concurrent edits; categories, specialisations and languages must be live; every specialisation belongs to one of the Talent's categories (removing a category removes its specialisations); one profile per account.
 
 **Volume:** 50,000 profiles per city; under a million rows in total.
 
@@ -64,29 +66,31 @@ Busy blocks and bookings are separate because they follow different rules: booki
 
 | Entity | Key fields |
 | --- | --- |
-| Category | ID, name, slug, status (live / retired), allowed work modes, display order |
+| Category | ID, name, slug, status (live / retired), allowed work modes, language relevant (yes / no), display order |
+| Specialisation | ID, category ID, slug, name, status (live / retired), display order |
+| Language | code (ISO 639), name, status (live / retired), display order |
 | City | ID, name, status (live / not live) |
 | Zone | ID, city ID, name, boundary (a shape on the map) |
-| Locality | ID, name, PIN code, city ID, centre point (seeded from a public dataset) |
+| Locality | ID, source ID, name, PIN code (may be empty), city ID, zone ID, centre point (seeded from a public dataset) |
 
 **Access patterns:** read everything, cached; find the zone containing a point; find the nearest zone for points outside every zone; search localities by name or PIN as the user types; rare Admin edits.
 
-**Guarantees:** unique names and slugs; a city's zones don't overlap; nothing referenced is deleted, only retired.
+**Guarantees:** unique names and slugs (a specialisation's slug is unique within its category); a locality's source ID is unique within its city, while locality names are not unique; every locality has a zone (the one containing its centre point, else the nearest); a city's zones don't overlap; nothing referenced is deleted, only retired.
 
-**Volume:** a few hundred rows.
+**Volume:** a few thousand rows.
 
 ## 5. Gigs
 
 | Entity | Key fields |
 | --- | --- |
-| Gig | ID, Poster account ID, category ID, title, description, start, end, work mode (on-site / remote), location point, city ID, zone ID, locality name, TA offered, budget minimum, budget maximum, status, published at, closed at, close reason, outcome, gig group ID |
+| Gig | ID, Poster account ID, category ID, specialisation ID (optional), language code (optional), title, description, start, end, work mode (on-site / remote), location point, city ID, zone ID, locality name, TA offered, budget minimum, budget maximum, status, published at, closed at, close reason, outcome, gig group ID |
 | Gig group | ID, Poster account ID, source (form / AI), AI drafting session ID, created at |
 
 **Lifecycle:** OPEN → FILLED (confirmed hire) or CANCELLED (by the Poster) or EXPIRED (start passed); FILLED → OPEN (hire cancelled before the start) or CANCELLED (Poster cancels; the hire is cancelled too). A filled gig can't be edited.
 
 **Access patterns:** insert one gig, or several in one transaction for an AI group; read by ID; list open gigs newest first (Phase 1); search open gigs by zone, category, date, budget and distance, plus remote gigs everywhere (Phase 3); list a Poster's gigs; conditional status updates; find open gigs whose start has passed (expiry, every minute).
 
-**Guarantees:** end after start, start in the future at publish; on-site gigs have a location, remote gigs have no location or TA, and the category allows the work mode; only valid status changes, using conditional updates; budget not negative.
+**Guarantees:** end after start, start in the future at publish; on-site gigs have a location, remote gigs have no location or TA, and the category allows the work mode; a specialisation belongs to the gig's category; a language is set only when the category is language-relevant; only valid status changes, using conditional updates; budget not negative.
 
 **Volume:** about 550,000 new gigs a year per city, of which only a small fraction is open at any time. Frequent queries target open gigs, so they must stay fast as closed gigs accumulate.
 
