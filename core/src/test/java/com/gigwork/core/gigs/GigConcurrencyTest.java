@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.gigwork.core.gigs.application.GigDraft;
+import com.gigwork.core.gigs.application.GigExpiry;
 import com.gigwork.core.gigs.application.GigService;
 import com.gigwork.core.gigs.application.GigView;
 import com.gigwork.core.gigs.domain.GigNotOpenException;
@@ -63,6 +64,8 @@ class GigConcurrencyTest {
 	TransactionTemplate transaction;
 	@Autowired
 	EventCollector collected;
+	@Autowired
+	GigExpiry expiry;
 
 	GigApiSupport api;
 	TestAccount poster;
@@ -189,6 +192,111 @@ class GigConcurrencyTest {
 		}
 		// both orders are possible; the test does not insist on seeing each of them
 		assertThat(editedAndCancelled + cancelledBeforeEdit).isEqualTo(rounds);
+	}
+
+	// ---- edit, cancel and expiry on one gig -------------------------------------------------------------------
+
+	/** A gig that starts in an hour; the clock is then moved to its start, as if the job runs the moment it is due. */
+	private StoredGig gigDueAtTheStart() {
+		GigDraft draft = new GigDraft(api.category("photographer"), null, null, "Original", "Reception photography",
+				clock.instant().plus(Duration.ofHours(1)), clock.instant().plus(Duration.ofHours(5)), WorkMode.ON_SITE,
+				api.indiranagar(), null, null, true, null, null);
+		StoredGig gig = store.find(gigs.publish(poster.id(), draft).id()).orElseThrow();
+		clock.set(gig.startAt());
+		collected.clear();
+		return gig;
+	}
+
+	/** The same gig, moved three days on: what an edit that arrived just before the start would write. */
+	private GigFields movedLater(StoredGig g) {
+		return new GigFields(g.categoryId(), null, null, "Edited", g.description(), g.startAt().plus(Duration.ofDays(3)),
+				g.startAt().plus(Duration.ofDays(3)).plus(Duration.ofHours(4)), g.workMode(), 12.97, 77.6, g.cityId(), g.zoneId(),
+				g.locationLabel(), null, true, null, null);
+	}
+
+	@Test
+	void aSweepThatHoldsTheRowMakesAnEditThatArrivesNextFindTheGigClosed() throws Exception {
+		StoredGig gig = gigDueAtTheStart();
+		CountDownLatch sweepHoldsTheRow = new CountDownLatch(1);
+		CountDownLatch editIsWaiting = new CountDownLatch(1);
+
+		CompletableFuture<Integer> sweep = CompletableFuture.supplyAsync(() -> transaction.execute(status -> {
+			int expired = store.expireDue(clock.instant(), 500).size();
+			sweepHoldsTheRow.countDown();
+			await(editIsWaiting);
+			sleep(300);
+			return expired;
+		}));
+		await(sweepHoldsTheRow);
+		CompletableFuture<Optional<GigStore.Changes>> edit = CompletableFuture.supplyAsync(() -> {
+			editIsWaiting.countDown();
+			// the request began a second before the start, so by its own clock the gig had not started
+			return transaction.execute(status -> store.update(gig.id(), poster.id(), movedLater(gig), gig.startAt().minusSeconds(1)));
+		});
+
+		assertThat(sweep.get(30, TimeUnit.SECONDS)).isEqualTo(1);
+		assertThat(edit.get(30, TimeUnit.SECONDS)).isEmpty();
+		assertThat(statusOf(gig.id())).isEqualTo("EXPIRED");
+		assertThat(titleOf(gig.id())).isEqualTo("Original");
+	}
+
+	@Test
+	void aSweepThatArrivesWhileAnEditHoldsTheRowLeavesTheGigOpenWithItsNewStart() throws Exception {
+		StoredGig gig = gigDueAtTheStart();
+		CountDownLatch editHoldsTheRow = new CountDownLatch(1);
+		CountDownLatch sweepHasRun = new CountDownLatch(1);
+
+		CompletableFuture<Optional<GigStore.Changes>> edit = CompletableFuture.supplyAsync(() -> transaction.execute(status -> {
+			Optional<GigStore.Changes> changes = store.update(gig.id(), poster.id(), movedLater(gig), gig.startAt().minusSeconds(1));
+			editHoldsTheRow.countDown();
+			await(sweepHasRun);
+			return changes;
+		}));
+		await(editHoldsTheRow);
+		long sweepChanged = expiry.run(); // skips the locked row instead of waiting for it
+		sweepHasRun.countDown();
+
+		assertThat(edit.get(30, TimeUnit.SECONDS)).isPresent();
+		assertThat(sweepChanged).isZero();
+		assertThat(statusOf(gig.id())).isEqualTo("OPEN");
+		assertThat(titleOf(gig.id())).isEqualTo("Edited");
+		assertThat(expiry.run()).isZero(); // and the next sweep finds it no longer due
+		assertThat(statusOf(gig.id())).isEqualTo("OPEN");
+	}
+
+	@Test
+	void anEditARunOfTheSweepAndACancelAtTheMomentOfTheStartLeaveOneConsistentOutcome() throws Exception {
+		int expired = 0;
+		int cancelled = 0;
+		for (int round = 0; round < 40; round++) {
+			StoredGig gig = gigDueAtTheStart();
+			List<Callable<String>> tasks = new ArrayList<>();
+			tasks.add(() -> transaction.execute(status -> store.update(gig.id(), poster.id(), movedLater(gig), gig.startAt().minusSeconds(1)))
+					.isPresent() ? "edited" : "edit-refused");
+			tasks.add(() -> attempt(() -> gigs.cancel(poster.id(), gig.id(), null)));
+			tasks.add(() -> "swept " + expiry.run());
+			List<String> results = Concurrently.runAll(tasks);
+
+			String finalStatus = statusOf(gig.id());
+			assertThat(finalStatus).isIn("CANCELLED", "EXPIRED"); // the cancel always reaches the gig: it either closes it or finds it expired
+			if (finalStatus.equals("EXPIRED")) {
+				expired++;
+				assertThat(results.get(0)).as("an expired gig was not edited").isEqualTo("edit-refused");
+				assertThat(titleOf(gig.id())).isEqualTo("Original");
+				assertThat(results.get(1)).isEqualTo("not-open");
+				assertThat(collected.of(GigExpired.class)).hasSize(1);
+				assertThat(collected.of(GigCancelled.class)).isEmpty();
+			}
+			else {
+				cancelled++;
+				assertThat(results.get(1)).isEqualTo("ok");
+				assertThat(titleOf(gig.id())).isEqualTo(results.get(0).equals("edited") ? "Edited" : "Original");
+				assertThat(collected.of(GigCancelled.class)).hasSize(1);
+				assertThat(collected.of(GigExpired.class)).isEmpty();
+			}
+			assertThat(expiry.run()).as("nothing is left to sweep for this gig").isZero();
+		}
+		assertThat(expired + cancelled).isEqualTo(40);
 	}
 
 	private static String attempt(Runnable action) {

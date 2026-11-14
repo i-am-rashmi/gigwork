@@ -92,6 +92,28 @@ public class GigStore {
 				.optional();
 	}
 
+	/** A gig the expiry sweep closed. */
+	public record Expired(UUID id, UUID posterId) {
+	}
+
+	/**
+	 * Expires up to {@code limit} open gigs whose start has passed (ADR-0010, FR-31): one conditional statement that
+	 * is safe to run twice at the same time. The rows are locked with SKIP LOCKED, so two sweeps take different gigs,
+	 * and a gig an edit or a cancel is changing right now is left for the next sweep (and is then no longer due, or no
+	 * longer open).
+	 */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public List<Expired> expireDue(Instant now, int limit) {
+		return jdbc.sql("""
+				UPDATE gigs.gig SET status = 'EXPIRED', closed_at = :now, updated_at = :now
+				WHERE id IN (SELECT id FROM gigs.gig WHERE status = 'OPEN' AND start_at <= :now
+				             ORDER BY start_at, id LIMIT :limit FOR UPDATE SKIP LOCKED)
+				  AND status = 'OPEN'
+				RETURNING id, poster_id""")
+				.param("now", ts(now)).param("limit", limit)
+				.query((rs, row) -> new Expired(rs.getObject("id", UUID.class), rs.getObject("poster_id", UUID.class))).list();
+	}
+
 	/** OPEN to CANCELLED for the Poster's own gig; false when no row matched (see {@link #update}). */
 	@Transactional(propagation = Propagation.MANDATORY)
 	public boolean cancel(UUID id, UUID posterId, String reason, Instant now) {

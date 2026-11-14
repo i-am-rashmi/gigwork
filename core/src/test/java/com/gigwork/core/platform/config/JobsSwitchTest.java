@@ -56,6 +56,7 @@ class JobsSwitchTest {
 
 	@Nested
 	@SpringBootTest
+	@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 	@TestPropertySource(properties = "gigwork.jobs.enabled=true")
 	@Import(TestcontainersConfiguration.class)
 	class On {

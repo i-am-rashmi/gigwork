@@ -26,11 +26,12 @@ import com.gigwork.core.gigs.domain.WorkMode;
 import com.gigwork.core.identity.AccountNames;
 import com.gigwork.core.reference.CategoryInfo;
 import com.gigwork.core.reference.LocationResolver;
+import com.gigwork.core.platform.JobRuns;
 import com.gigwork.core.reference.ReferenceData;
 
 /**
  * The Gigs module on its own, against real PostgreSQL: its own beans plus what it asks other modules for (reference
- * data, the location resolver and first names, stubbed here, and the platform clock).
+ * data, the location resolver, first names and the job recorder, stubbed here, and the platform clock).
  */
 @ApplicationModuleTest
 @Import({ TestcontainersConfiguration.class, GigsModuleTest.Platform.class })
@@ -54,6 +55,8 @@ class GigsModuleTest {
 	LocationResolver locations;
 	@MockitoBean
 	AccountNames names;
+	@MockitoBean
+	JobRuns jobRuns;
 
 	@Test
 	void aRemoteGigIsPublishedAndCancelledUsingOnlyTheModulesOwnBeansAndStubbedNeighbours() {
