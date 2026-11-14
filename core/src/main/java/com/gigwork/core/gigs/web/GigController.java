@@ -18,6 +18,7 @@ import com.gigwork.core.gigs.application.GigDraft;
 import com.gigwork.core.gigs.application.GigQuery;
 import com.gigwork.core.gigs.application.GigService;
 import com.gigwork.core.gigs.web.dto.CancelRequest;
+import com.gigwork.core.gigs.web.dto.GigEditRequest;
 import com.gigwork.core.gigs.web.dto.GigListResponse;
 import com.gigwork.core.gigs.web.dto.GigRequest;
 import com.gigwork.core.gigs.web.dto.GigResponse;
@@ -78,6 +79,15 @@ class GigController {
 		return GigResponse.of(gigs.gig(id, CurrentAccount.optional()));
 	}
 
+	static GigDraft draft(GigEditRequest r) {
+		GigRequest.Location place = r.location();
+		GigRequest.Point point = place == null ? null : place.point();
+		return new GigDraft(null, r.specialisationId(), r.languageCode(), r.title(), r.description(),
+				r.startAt().toInstant(), r.endAt().toInstant(), null, place == null ? null : place.localityId(),
+				point == null ? null : point.lat(), point == null ? null : point.lng(), r.taOffered(), r.budgetMin(),
+				r.budgetMax());
+	}
+
 	@Operation(summary = "Publish a gig",
 			description = "The gig starts OPEN. It must start in the future, at most 1 year ahead, and last at most "
 					+ "14 days. The title and description may not contain phone numbers, email addresses or contact "
@@ -93,12 +103,13 @@ class GigController {
 
 	@Operation(summary = "Edit an open gig",
 			description = "Replaces every editable field (a field left out is cleared). The category and the work "
-					+ "mode must be the gig's current ones. Applicants are told about a change of date, time or location.")
-	@ApiResponse(responseCode = "400", description = "A rule is broken, or the category or work mode differ")
+					+ "mode can't be changed and are not part of the request: the gig's own are used. Applicants are "
+					+ "told about a change of date, time or location.")
+	@ApiResponse(responseCode = "400", description = "A rule is broken; the message says which")
 	@ApiResponse(responseCode = "404", description = "No such gig, or it is not yours")
 	@ApiResponse(responseCode = "409", description = "The gig is no longer open, or it has started")
 	@PutMapping("/{id}")
-	GigResponse edit(@PathVariable UUID id, @Valid @RequestBody GigRequest request) {
+	GigResponse edit(@PathVariable UUID id, @Valid @RequestBody GigEditRequest request) {
 		return GigResponse.of(gigs.edit(CurrentAccount.required(), id, draft(request)));
 	}
 

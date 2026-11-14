@@ -17,4 +17,11 @@ import com.gigwork.core.gigs.domain.WorkMode;
 public record GigDraft(UUID categoryId, UUID specialisationId, String languageCode, String title, String description,
 		Instant startAt, Instant endAt, WorkMode workMode, UUID localityId, Double lat, Double lng, Boolean taOffered,
 		BigDecimal budgetMin, BigDecimal budgetMax) {
+
+	/** The same draft for a gig that already exists: its category and work mode are the gig's, not the request's. */
+	GigDraft forGig(UUID category, WorkMode mode) {
+		return new GigDraft(category, specialisationId, languageCode, title, description, startAt, endAt, mode, localityId,
+				lat, lng, taOffered, budgetMin, budgetMax);
+	}
+
 }

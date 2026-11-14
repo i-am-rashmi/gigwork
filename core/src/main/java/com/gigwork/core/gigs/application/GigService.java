@@ -90,12 +90,16 @@ public class GigService {
 	}
 
 	/**
-	 * Replaces the editable fields of an open gig that has not started (FR-18). The category and the work mode must
-	 * be the gig's current ones.
+	 * Replaces the editable fields of an open gig that has not started (FR-18). The draft is checked against the
+	 * gig's own category and work mode, which are read first: both are fixed once a gig is published, so nothing can
+	 * change them between this read and the update. A gig that doesn't exist or isn't the caller's is a 404 before
+	 * anything else is looked at.
 	 */
 	public GigView edit(UUID posterId, UUID gigId, GigDraft draft) {
 		Instant now = clock.instant();
-		GigFields fields = validate(draft, now);
+		StoredGig current = store.find(gigId).filter(g -> g.posterId().equals(posterId))
+				.orElseThrow(GigNotFoundException::new);
+		GigFields fields = validate(draft.forGig(current.categoryId(), current.workMode()), now);
 		boolean changed = Boolean.TRUE.equals(transaction.execute(status -> {
 			Optional<GigStore.Changes> changes = store.update(gigId, posterId, fields, now);
 			changes.filter(c -> c.dateTime() || c.location() || c.matching())
@@ -106,7 +110,7 @@ public class GigService {
 			return changes.isPresent();
 		}));
 		if (!changed) {
-			throw refusal(posterId, gigId, now, fields);
+			throw refusal(posterId, gigId);
 		}
 		return views.of(store.find(gigId).orElseThrow(), Optional.of(posterId));
 	}
@@ -126,30 +130,18 @@ public class GigService {
 			return done;
 		}));
 		if (!cancelled) {
-			throw refusal(posterId, gigId, now, null);
+			throw refusal(posterId, gigId);
 		}
 		return views.of(store.find(gigId).orElseThrow(), Optional.of(posterId));
 	}
 
 	/**
-	 * Why a conditional statement matched no row. 404 for a gig that doesn't exist or isn't the caller's (never says
-	 * which); 409 when it is the caller's but not open or already started; 400 when only the category or the work
-	 * mode differ.
+	 * Why a conditional statement matched no row: 404 for a gig that doesn't exist or isn't the caller's (never says
+	 * which), 409 when it is the caller's but is not open (or, for an edit, has already started).
 	 */
-	private RuntimeException refusal(UUID posterId, UUID gigId, Instant now, GigFields attempted) {
+	private RuntimeException refusal(UUID posterId, UUID gigId) {
 		Optional<StoredGig> gig = store.find(gigId).filter(g -> g.posterId().equals(posterId));
-		if (gig.isEmpty()) {
-			return new GigNotFoundException();
-		}
-		StoredGig g = gig.get();
-		if (g.status() != GigStatus.OPEN || (attempted != null && !g.startAt().isAfter(now))) {
-			return new GigNotOpenException();
-		}
-		if (attempted != null && (!g.categoryId().equals(attempted.categoryId()) || g.workMode() != attempted.workMode())) {
-			return new InvalidGigException("The category and the work mode of a published gig can't be changed.");
-		}
-		// still open and unchanged in the ways we check: it changed again while we were looking
-		return new GigNotOpenException();
+		return gig.isEmpty() ? new GigNotFoundException() : new GigNotOpenException();
 	}
 
 	// ---- reading ----------------------------------------------------------------------------------------------

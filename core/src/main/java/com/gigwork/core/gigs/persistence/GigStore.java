@@ -59,13 +59,13 @@ public class GigStore {
 	}
 
 	/**
-	 * Replaces the editable fields of the Poster's gig, if it is still OPEN, has not started, and is in the same
-	 * category and work mode (both are fixed once published). The row is locked by the statement itself, so a
+	 * Replaces the editable fields of the Poster's gig, if it is still OPEN and has not started. The category and the
+	 * work mode are never written: they are fixed once published. The row is locked by the statement itself, so a
 	 * simultaneous cancel or expiry either happened first (no row matches) or waits and then finds the gig no longer
 	 * open.
 	 *
-	 * @return what changed, or empty when no row matched: the gig doesn't exist, isn't the Poster's, isn't open, has
-	 *         started, or has another category or work mode
+	 * @return what changed, or empty when no row matched: the gig doesn't exist, isn't the Poster's, isn't open, or has
+	 *         started
 	 */
 	@Transactional(propagation = Propagation.MANDATORY)
 	public Optional<Changes> update(UUID id, UUID posterId, GigFields f, Instant now) {
@@ -74,7 +74,6 @@ public class GigStore {
 				    SELECT id, start_at, end_at, lat, lng, city_id, zone_id, location_label, specialisation_id, language_code
 				    FROM gigs.gig
 				    WHERE id = :id AND poster_id = :poster AND status = 'OPEN' AND start_at > :now
-				      AND category_id = :category AND work_mode = :mode
 				    FOR UPDATE)
 				UPDATE gigs.gig g SET specialisation_id = :specialisation, language_code = :language, title = :title,
 				    description = :description, start_at = :start, end_at = :end, lat = :lat, lng = :lng, city_id = :city,

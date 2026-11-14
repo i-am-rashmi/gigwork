@@ -63,7 +63,7 @@ public final class GigApiSupport {
 	}
 
 	public ResultActions edit(TestAccount poster, UUID id, Gig gig) throws Exception {
-		return mvc.perform(auth(put("/v1/gigs/" + id), poster).contentType(MediaType.APPLICATION_JSON).content(gig.json()));
+		return mvc.perform(auth(put("/v1/gigs/" + id), poster).contentType(MediaType.APPLICATION_JSON).content(gig.editJson()));
 	}
 
 	public ResultActions cancel(TestAccount poster, UUID id, String body) throws Exception {
@@ -132,16 +132,27 @@ public final class GigApiSupport {
 		public Instant start() { return start; }
 		public Instant end() { return end != null ? end : start.plus(length); }
 
+		/** The body of an edit: the same, without the category and the work mode (fixed once published). */
+		public String editJson() {
+			return body(false);
+		}
+
 		public String json() {
+			return body(true);
+		}
+
+		private String body(boolean withCategoryAndMode) {
 			StringBuilder json = new StringBuilder("{");
-			json.append("\"categoryId\":").append(ProfileApiSupport.quote(category == null ? null : category.toString()));
-			json.append(",\"specialisationId\":").append(ProfileApiSupport.quote(specialisation == null ? null : specialisation.toString()));
+			if (withCategoryAndMode) {
+				json.append("\"categoryId\":").append(ProfileApiSupport.quote(category == null ? null : category.toString()));
+				json.append(",\"workMode\":").append(ProfileApiSupport.quote(workMode)).append(',');
+			}
+			json.append("\"specialisationId\":").append(ProfileApiSupport.quote(specialisation == null ? null : specialisation.toString()));
 			json.append(",\"languageCode\":").append(ProfileApiSupport.quote(language));
 			json.append(",\"title\":").append(ProfileApiSupport.quote(title));
 			json.append(",\"description\":").append(ProfileApiSupport.quote(description));
 			json.append(",\"startAt\":").append(ProfileApiSupport.quote(start == null ? null : start.toString()));
 			json.append(",\"endAt\":").append(ProfileApiSupport.quote(start == null ? null : end().toString()));
-			json.append(",\"workMode\":").append(ProfileApiSupport.quote(workMode));
 			if (locality != null) {
 				json.append(",\"location\":{\"localityId\":\"").append(locality).append("\"}");
 			}

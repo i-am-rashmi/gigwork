@@ -147,16 +147,55 @@ class GigEditCancelApiTest {
 	}
 
 	@Test
-	void theCategoryAndTheWorkModeCannotBeChanged() throws Exception {
+	void theEditRequestHasNoCategoryOrWorkModeAndAnyThatAreSentAreIgnored() throws Exception {
 		UUID onSite = published(api.onSite());
-		UUID both = published(api.onSite().category(api.category("painter-caricature")));
+		UUID remote = published(api.remote());
+		UUID videographer = api.category("videographer");
 
-		api.edit(poster, onSite, api.onSite().category(api.category("videographer"))).andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("can't be changed")));
-		api.edit(poster, both, api.remote().category(api.category("painter-caricature"))).andExpect(status().isBadRequest());
+		api.edit(poster, onSite, api.onSite().title("Still a photographer")
+				.extra("\"categoryId\":\"" + videographer + "\",\"workMode\":\"REMOTE\"")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.categoryId").value(api.category("photographer").toString()))
+				.andExpect(jsonPath("$.workMode").value("ON_SITE"));
+		api.edit(poster, remote, api.remote().title("Still remote").extra("\"workMode\":\"ON_SITE\"")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.workMode").value("REMOTE"));
 
 		assertThat(row(onSite).get("category_id")).isEqualTo(api.category("photographer"));
-		assertThat(row(both).get("work_mode")).isEqualTo("ON_SITE");
+		assertThat(row(onSite).get("work_mode")).isEqualTo("ON_SITE");
+		assertThat(row(remote).get("work_mode")).isEqualTo("REMOTE");
+		assertThat(row(remote).get("lat")).isNull();
+	}
+
+	@Test
+	void anEditIsCheckedAgainstTheGigsOwnCategoryAndWorkMode() throws Exception {
+		UUID onSite = published(api.onSite());
+		UUID remote = published(api.remote());
+		UUID both = published(api.remote().category(api.category("painter-caricature")));
+
+		// an on-site gig still needs its location and travel-allowance flag
+		api.edit(poster, onSite, api.onSite().noLocation()).andExpect(status().isBadRequest());
+		api.edit(poster, onSite, api.onSite().ta(null)).andExpect(status().isBadRequest());
+		// a remote gig still has neither, even in a category that also allows on-site work
+		api.edit(poster, remote, api.remote().locality(api.indiranagar())).andExpect(status().isBadRequest());
+		api.edit(poster, remote, api.remote().ta(true)).andExpect(status().isBadRequest());
+		api.edit(poster, both, api.remote().category(api.category("painter-caricature")).point(12.97, 77.6)).andExpect(status().isBadRequest());
+		api.edit(poster, both, api.remote().category(api.category("painter-caricature"))).andExpect(status().isOk());
+		// the gig's category decides the specialisation and language rules
+		api.edit(poster, onSite, api.onSite().language("hi")).andExpect(status().isBadRequest());
+		api.edit(poster, onSite, api.onSite().specialisation(api.specialisation("videographer", "wedding-films"))).andExpect(status().isBadRequest());
+		api.edit(poster, onSite, api.onSite().specialisation(api.specialisation("photographer", "candid"))).andExpect(status().isOk());
+
+		assertThat(row(both).get("work_mode")).isEqualTo("REMOTE");
+		assertThat(row(onSite).get("category_id")).isEqualTo(api.category("photographer"));
+	}
+
+	@Test
+	void aGigThatIsNotTheCallersIsNotFoundBeforeTheBodyIsLookedAt() throws Exception {
+		UUID id = published(api.onSite());
+
+		// a rule the service checks (contact details), so the answer would tell a stranger whether the gig exists
+		api.edit(other, id, api.onSite().title("Call 9876543210")).andExpect(status().isNotFound());
+		api.edit(poster, UUID.randomUUID(), api.onSite().title("Call 9876543210")).andExpect(status().isNotFound());
+		api.edit(poster, id, api.onSite().title("Call 9876543210")).andExpect(status().isBadRequest());
 	}
 
 	@Test
