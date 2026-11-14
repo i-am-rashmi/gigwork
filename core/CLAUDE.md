@@ -56,6 +56,11 @@ The base package holds only the module's public API. Result records that never l
 - Times are `Instant`/`OffsetDateTime` in UTC; stored as `TIMESTAMPTZ`.
 - Timestamps are truncated to microseconds (PostgreSQL's precision, which rounds anything finer) before they are stored or compared. Use the injected `Clock`, which does this, never `Instant.now()`. On Linux `Instant.now()` has nanoseconds, so a value compared with its stored copy can differ by up to half a microsecond.
 
+## Seed data (reference)
+
+- Reference data (categories, specialisations, languages, cities, zones, localities) is seeded from `infra/seed/` by Java seed migrations listed in `src/main/resources/db/seed-migrations.csv`; see `infra/seed/README.md`. Their checksum is a hash of the seed files, so editing a seed file that is already on `main` fails Flyway validation: add a new seed migration instead. Use the next free version number across SQL and seed migrations.
+- **The build reads `../infra/seed`** (Maven copies it into the jar), so the build needs the repository root. Any future Docker build must use the repo root as its context, not `core/`.
+
 ## Authentication and configuration (identity)
 
 - Every endpoint needs a bearer access token except the ones declared public (currently `POST /v1/auth/otp/request`, `/v1/auth/otp/verify`, `/v1/auth/token/refresh`, the health probes and the API docs). **Public endpoints are declared in the owning module with a `PublicEndpoints` bean (ADR-0009), never by editing the security configuration** (which lives in the platform module). Public means "no token required": an invalid or expired token is still a 401. `PublicEndpointsTest` lists every public endpoint, so adding one means changing that test on purpose.
