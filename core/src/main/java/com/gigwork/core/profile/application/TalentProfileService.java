@@ -71,7 +71,13 @@ public class TalentProfileService {
 
 	// ---- saving the three sections --------------------------------------------------------------------------
 
+	/** The first name every Talent has (shown to logged-in users) must exist before a profile is set up (FR-4). */
+	static final String FIRST_NAME_REQUIRED = "Add your first name before setting up your profile";
+
 	public ProfileView saveWork(UUID accountId, WorkCommand command) {
+		if (names.firstName(accountId).isEmpty()) {
+			throw new InvalidProfileException(FIRST_NAME_REQUIRED);
+		}
 		ProfileStore.Work work = validate(command);
 		transaction.executeWithoutResult(status -> {
 			store.lockOrCreate(accountId, clock.instant());

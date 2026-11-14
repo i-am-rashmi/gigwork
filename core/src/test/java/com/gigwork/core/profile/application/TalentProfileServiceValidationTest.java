@@ -49,6 +49,7 @@ class TalentProfileServiceValidationTest {
 	private final ReferenceData reference = mock(ReferenceData.class);
 	private final ProfileStore store = mock(ProfileStore.class);
 	private final TransactionTemplate transaction = mock(TransactionTemplate.class);
+	private final AccountNames names = mock(AccountNames.class);
 	private TalentProfileService service;
 
 	@BeforeEach
@@ -62,7 +63,8 @@ class TalentProfileServiceValidationTest {
 		when(reference.languages()).thenReturn(List.of(new LanguageInfo("kn", "Kannada", 1)));
 		ProfileProperties properties = new ProfileProperties(5, 10, 10, new ProfileProperties.Location(50, 2000),
 				new ProfileProperties.Portfolio(List.of("bit.ly")));
-		service = new TalentProfileService(store, reference, mock(AccountNames.class), properties, transaction,
+		when(names.firstName(ACCOUNT)).thenReturn(Optional.of("Asha"));
+		service = new TalentProfileService(store, reference, names, properties, transaction,
 				Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
 	}
 
@@ -72,6 +74,16 @@ class TalentProfileServiceValidationTest {
 
 	private void assertRefusedAndNothingSaved(Runnable save, Class<? extends RuntimeException> type) {
 		assertThatThrownBy(save::run).isInstanceOf(type);
+		verifyNoInteractions(transaction, store);
+	}
+
+	@Test
+	void theWorkSectionNeedsAFirstNameAndSavesNothingWithout() {
+		when(names.firstName(ACCOUNT)).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.saveWork(ACCOUNT, work(List.of(LIVE), List.of(), List.of())))
+				.isInstanceOf(com.gigwork.core.profile.domain.InvalidProfileException.class)
+				.hasMessage("Add your first name before setting up your profile");
 		verifyNoInteractions(transaction, store);
 	}
 
@@ -103,7 +115,7 @@ class TalentProfileServiceValidationTest {
 	@Test
 	void theLimitsAreTheConfiguredOnes() {
 		ProfileProperties small = new ProfileProperties(2, 1, 1, new ProfileProperties.Location(50, 2000), new ProfileProperties.Portfolio(List.of()));
-		TalentProfileService strict = new TalentProfileService(store, reference, mock(AccountNames.class), small, transaction,
+		TalentProfileService strict = new TalentProfileService(store, reference, names, small, transaction,
 				Clock.systemUTC());
 		UUID third = UUID.randomUUID();
 		when(reference.isLiveCategory(third)).thenReturn(true);

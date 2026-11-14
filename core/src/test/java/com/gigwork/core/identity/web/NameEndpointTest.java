@@ -38,7 +38,7 @@ class NameEndpointTest {
 	@ParameterizedTest
 	@ValueSource(strings = { "Asha", "D'Souza", "Mary-Ann", "A. R.", "ಆಶಾ", "आशा", "José", "Mária", "O’Neil" })
 	void acceptsNamesMadeOfLettersSpacesApostrophesHyphensAndDots(String name) throws Exception {
-		TestAccount account = accounts.create();
+		TestAccount account = accounts.createWithoutName();
 
 		setName(account, name).andExpect(status().isOk()).andExpect(jsonPath("$.firstName").isNotEmpty());
 
@@ -47,7 +47,7 @@ class NameEndpointTest {
 
 	@Test
 	void trimsAndCollapsesSpaces() throws Exception {
-		TestAccount account = accounts.create();
+		TestAccount account = accounts.createWithoutName();
 
 		setName(account, "  Asha   Rani ").andExpect(status().isOk()).andExpect(jsonPath("$.firstName").value("Asha Rani"));
 
@@ -58,7 +58,7 @@ class NameEndpointTest {
 	@ValueSource(strings = { "", "   ", "Asha1", "4sha", "Asha_", "Asha!", "-Asha", ".Asha", "Asha@x.com", "A\tB", "Asha😀",
 			"Asha\nRani" })
 	void rejectsEmptyAndCharactersThatAreNotPartOfAName(String name) throws Exception {
-		TestAccount account = accounts.create();
+		TestAccount account = accounts.createWithoutName();
 
 		setName(account, name).andExpect(status().isBadRequest());
 
@@ -67,7 +67,7 @@ class NameEndpointTest {
 
 	@Test
 	void rejectsMoreThan50CharactersButAcceptsExactly50() throws Exception {
-		TestAccount account = accounts.create();
+		TestAccount account = accounts.createWithoutName();
 
 		setName(account, "A".repeat(51)).andExpect(status().isBadRequest());
 		setName(account, "A".repeat(50)).andExpect(status().isOk());
@@ -76,7 +76,7 @@ class NameEndpointTest {
 	@ParameterizedTest
 	@ValueSource(strings = { "wa.me", "t.me", "telegram.me", "api.whatsapp.com" })
 	void rejectsContactLinksWithTheContactMessage(String name) throws Exception {
-		TestAccount account = accounts.create();
+		TestAccount account = accounts.createWithoutName();
 
 		setName(account, name).andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.detail").value("Contact details can't be in your profile. Posters reach you through GigWork."));
@@ -84,7 +84,7 @@ class NameEndpointTest {
 
 	@Test
 	void aMissingNameIsABadRequest() throws Exception {
-		setName(accounts.create(), null).andExpect(status().isBadRequest());
+		setName(accounts.createWithoutName(), null).andExpect(status().isBadRequest());
 	}
 
 	@Test
@@ -104,7 +104,7 @@ class NameEndpointTest {
 
 	@Test
 	void nameIsAbsentUntilSetAndReadableThroughTheApiAfter() throws Exception {
-		TestAccount account = accounts.create();
+		TestAccount account = accounts.createWithoutName();
 		assertThat(names.firstName(account.id())).isEmpty();
 		assertThat(names.firstName(UUID.randomUUID())).isEmpty();
 
@@ -116,8 +116,8 @@ class NameEndpointTest {
 
 	@Test
 	void aNameCanOnlyBeSetForTheCallersOwnAccount() throws Exception {
-		TestAccount mine = accounts.create();
-		TestAccount other = accounts.create();
+		TestAccount mine = accounts.createWithoutName();
+		TestAccount other = accounts.createWithoutName();
 
 		setName(mine, "Asha").andExpect(status().isOk());
 

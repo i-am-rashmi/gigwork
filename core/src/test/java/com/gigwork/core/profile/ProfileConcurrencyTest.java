@@ -16,6 +16,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 
 import com.gigwork.core.identity.support.Concurrently;
 import com.gigwork.core.identity.support.IdentityIntegrationTest;
+import com.gigwork.core.identity.support.TestAccounts;
 import com.gigwork.core.profile.application.LocationCommand;
 import com.gigwork.core.profile.application.TalentProfileService;
 import com.gigwork.core.profile.application.WorkCommand;
@@ -40,6 +41,13 @@ class ProfileConcurrencyTest {
 	ReferenceData reference;
 	@Autowired
 	JdbcClient jdbc;
+	@Autowired
+	TestAccounts accounts;
+
+	/** Saving the work section needs an account with a first name. */
+	private UUID namedAccount() {
+		return accounts.create().id();
+	}
 
 	private List<UUID> categories(int from, int count) {
 		return reference.liveCategories().subList(from, from + count).stream().map(CategoryInfo::id).toList();
@@ -80,7 +88,7 @@ class ProfileConcurrencyTest {
 		int secondWins = 0;
 
 		for (int round = 0; round < ROUNDS; round++) {
-			UUID account = UUID.randomUUID();
+			UUID account = namedAccount();
 			Concurrently.runAll(List.<Callable<Object>>of(() -> service.saveWork(account, work(three, specsOfThree, "Three")),
 					() -> service.saveWork(account, work(four, specsOfFour, "Four"))));
 
@@ -107,7 +115,7 @@ class ProfileConcurrencyTest {
 		List<List<UUID>> categorySets = List.of(categories(0, 1), categories(1, 2), categories(3, 3), categories(6, 4), categories(10, 5));
 		for (int i = 0; i < 15; i++) {
 			int round = i;
-			UUID account = UUID.randomUUID();
+			UUID account = namedAccount();
 			List<Callable<Object>> tasks = new ArrayList<>();
 			for (List<UUID> set : categorySets) {
 				List<UUID> specs = specialisations(set, 10);
@@ -127,7 +135,7 @@ class ProfileConcurrencyTest {
 	void theLimitsHoldUnderConcurrentSaves() throws Exception {
 		List<UUID> five = categories(0, 5);
 		List<UUID> tenSpecs = specialisations(five, 10);
-		UUID account = UUID.randomUUID();
+		UUID account = namedAccount();
 
 		Concurrently.runAll(12, () -> service.saveWork(account, work(five, tenSpecs, "Max")));
 
@@ -139,7 +147,7 @@ class ProfileConcurrencyTest {
 	void simultaneousSavesOfDifferentSectionsAllLand() throws Exception {
 		LocationCommand location = new LocationCommand(reference.searchLocalities("indiranagar", 1).get(0).id(), null, null, 12, true);
 		for (int round = 0; round < 20; round++) {
-			UUID account = UUID.randomUUID();
+			UUID account = namedAccount();
 			Concurrently.runAll(List.<Callable<Object>>of(() -> service.saveWork(account, work(categories(0, 2), List.of(), "Work")),
 					() -> service.saveLocation(account, location), () -> service.savePortfolio(account, List.of("example.com", "instagram.com/a")),
 					() -> service.setHidden(account, false)));
@@ -155,7 +163,7 @@ class ProfileConcurrencyTest {
 	@Test
 	void simultaneousFirstSavesCreateOneProfile() throws Exception {
 		for (int round = 0; round < 20; round++) {
-			UUID account = UUID.randomUUID();
+			UUID account = namedAccount();
 
 			Concurrently.runAll(8, () -> service.setHidden(account, true));
 

@@ -122,6 +122,30 @@ class TalentProfileApiTest {
 	// ---- work section ----------------------------------------------------------------------------------------------
 
 	@Test
+	void theWorkSectionNeedsAFirstNameButTheOtherSectionsDoNot() throws Exception {
+		TestAccount unnamed = accounts.createWithoutName();
+
+		api.put(unnamed, "work", api.simpleWork(photographer)).andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detail").value("Add your first name before setting up your profile"));
+		api.getOwn(unnamed).andExpect(status().isNotFound()); // nothing was saved
+
+		api.put(unnamed, "location", location()).andExpect(status().isOk());
+		api.put(unnamed, "portfolio", ProfileApiSupport.links("example.com")).andExpect(status().isOk());
+		api.put(unnamed, "work", api.simpleWork(photographer)).andExpect(status().isBadRequest());
+
+		accounts.setFirstName(unnamed.id(), "Asha");
+		api.put(unnamed, "work", api.simpleWork(photographer)).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("ACTIVE"));
+	}
+
+	@Test
+	void aBlankStoredNameDoesNotCount() throws Exception {
+		TestAccount blank = accounts.createWithoutName();
+		accounts.setFirstName(blank.id(), "   ");
+
+		api.put(blank, "work", api.simpleWork(photographer)).andExpect(status().isBadRequest());
+	}
+
+	@Test
 	void savesAndReturnsTheWorkSection() throws Exception {
 		UUID wedding = api.specialisationId("photographer", "wedding");
 		UUID candid = api.specialisationId("photographer", "candid");

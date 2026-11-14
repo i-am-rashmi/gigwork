@@ -56,6 +56,7 @@ class ProfileModuleTest {
 		UUID account = UUID.randomUUID();
 		UUID category = UUID.randomUUID();
 		when(reference.isLiveCategory(category)).thenReturn(true);
+		when(names.firstName(account)).thenReturn(Optional.of("Asha"));
 
 		profiles.saveWork(account, new WorkCommand(ProfileType.INDIVIDUAL, null, "Module test", null, List.of(category), List.of(), List.of()));
 

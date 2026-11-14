@@ -93,6 +93,7 @@ class TalentProfileVisibilityTest {
 		TestAccount unnamed = accounts.create();
 		api.put(unnamed, "work", api.simpleWork(api.categoryId("photographer")));
 		api.put(unnamed, "location", ProfileApiSupport.locationByPoint(12.975, 77.605, 5, false));
+		accounts.setFirstName(unnamed.id(), null); // the name was needed to save the work; it can be cleared later
 
 		api.view(unnamed.id(), other.header()).andExpect(status().isOk()).andExpect(jsonPath("$.firstName").doesNotExist());
 	}

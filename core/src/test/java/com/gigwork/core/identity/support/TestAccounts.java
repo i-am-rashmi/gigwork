@@ -33,7 +33,14 @@ public class TestAccounts {
 		this.clock = clock;
 	}
 
+	/** An account with a first name, as a Talent needs before saving a profile. */
 	public TestAccount create() {
+		TestAccount account = createWithoutName();
+		setFirstName(account.id(), "Tester");
+		return account;
+	}
+
+	public TestAccount createWithoutName() {
 		UUID id = UUID.randomUUID();
 		jdbc.sql("INSERT INTO identity.account (id) VALUES (:id)").param("id", id).update();
 		// a verified number, like every real account has: tests of the login flow count accounts without one as orphans
