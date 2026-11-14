@@ -71,6 +71,7 @@ def build_report(ctx: dict) -> str:
           f"- Dropped, missing/zero/invalid coordinates: {c.bad_coords:,}",
           f"- Dropped, invalid PIN: {c.bad_pin:,}",
           f"- Dropped, outside the region (zones bbox + margin): {c.out_of_region:,}",
+          f"- Dropped, PIN prefix not in {', '.join(c.prefixes)} (offices geocoded into the wrong city): {c.wrong_prefix:,}",
           f"- Offices used as candidates: {c.kept:,}"]
     rows = ctx["localities"]
     with_pin = [r for r in rows if r["pin"]]

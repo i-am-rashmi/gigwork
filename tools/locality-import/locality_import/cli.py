@@ -29,6 +29,10 @@ def parse_args(argv=None):
                    help="comma-separated zone names the file must contain exactly; empty string disables the check")
     p.add_argument("--buffer-m", type=float, default=500, help="keep places this far outside the zones")
     p.add_argument("--max-pin-m", type=float, default=3000, help="max distance to a post office for a PIN")
+    p.add_argument("--pin-prefixes", default="",
+                   help="comma-separated PIN prefixes belonging to the city (e.g. 560,562); post offices with other "
+                        "prefixes are ignored because India Post coordinates are sometimes wrong. "
+                        "Default: the most common 3-digit prefix among offices in the region")
     p.add_argument("--dedupe-m", type=float, default=1000, help="merge same-named places within this distance")
     p.add_argument("--simplify-m", type=float, default=10, help="zone simplification tolerance in metres")
     p.add_argument("--seed-dir", type=Path, default=None, help="default: <repo>/infra/seed/<city>")
@@ -73,6 +77,9 @@ def run(args, fetcher=places.fetch_overpass) -> dict:
     # 4. PINs from valid post offices near the region.
     margin_deg = (args.buffer_m + args.max_pin_m) / 111_000 * 1.5
     offices, office_counts = pins.load_offices(args.pins, (w, s, e, n), margin_deg)
+    prefixes = tuple(x.strip() for x in args.pin_prefixes.split(",") if x.strip()) or (pins.modal_prefix(offices),)
+    offices, office_counts.wrong_prefix = pins.filter_by_prefix(offices, prefixes)
+    office_counts.prefixes, office_counts.kept = prefixes, len(offices)
     for o in offices:
         o["x"], o["y"] = lonlat_to_xy(o["lon"], o["lat"], crs)
     assigned = pins.assign_pins(merged, offices, args.max_pin_m)

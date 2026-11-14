@@ -44,3 +44,19 @@ def test_load_offices_discards_invalid_and_out_of_region(tmp_path):
     offices, c = pins.load_offices(f, (77.4, 12.8, 77.8, 13.2), 0.05)
     assert [o["pin"] for o in offices] == ["560001"]
     assert (c.total, c.bad_coords, c.bad_pin, c.out_of_region, c.kept) == (6, 2, 1, 2, 1)
+
+
+def test_filter_by_prefix_drops_offices_geocoded_from_elsewhere():
+    offices = [O("560001", "a", 0, 0), O("562125", "b", 0, 0), O("577534", "wrong city", 0, 0)]
+    kept, dropped = pins.filter_by_prefix(offices, ("560", "562"))
+    assert [o["pin"] for o in kept] == ["560001", "562125"] and dropped == 1
+
+
+def test_wrong_prefix_office_never_wins_even_if_nearest():
+    offices, _ = pins.filter_by_prefix([O("577534", "wrong", 10, 0), O("560001", "right", 2_500, 0)], ("560",))
+    assert pins.assign_pins([{"name": "A", "x": 0, "y": 0}], offices, 3_000)[0]["pin"] == "560001"
+
+
+def test_modal_prefix():
+    assert pins.modal_prefix([O("560001", "a", 0, 0), O("560002", "b", 0, 0), O("577001", "c", 0, 0)]) == "560"
+    assert pins.modal_prefix([]) == ""

@@ -28,6 +28,8 @@ class OfficeCounts:
     bad_coords: int = 0  # missing, NA, zero or not a number, or lat/lon out of range
     bad_pin: int = 0
     out_of_region: int = 0
+    wrong_prefix: int = 0  # valid coordinates in the region, but a PIN that belongs to another area (bad geocode)
+    prefixes: tuple = ()
     kept: int = 0
 
 
@@ -78,3 +80,22 @@ def assign_pins(places: list[dict], offices: list[dict], max_m: float) -> list[d
         else:
             out.append({**p, "pin": "", "pin_office": "", "pin_distance_m": None})
     return out
+
+
+def modal_prefix(offices: list[dict], digits: int = 3) -> str:
+    """The most common PIN prefix among the offices (ties: lowest). Empty string if there are none."""
+    from collections import Counter
+
+    counts = Counter(o["pin"][:digits] for o in offices)
+    return sorted(counts, key=lambda k: (-counts[k], k))[0] if counts else ""
+
+
+def filter_by_prefix(offices: list[dict], prefixes) -> tuple[list[dict], int]:
+    """Keep offices whose PIN starts with one of `prefixes`.
+
+    India Post coordinates are sometimes wrong (an office in another district geocoded into this city),
+    so a nearby office with an unrelated PIN prefix must never supply a PIN. Returns (kept, dropped count).
+    """
+    prefixes = tuple(prefixes)
+    kept = [o for o in offices if o["pin"].startswith(prefixes)]
+    return kept, len(offices) - len(kept)
