@@ -44,4 +44,12 @@ class Account extends AssignedIdEntity {
 		return status;
 	}
 
+	String getFirstName() {
+		return firstName;
+	}
+
+	void setFirstName(String firstName) {
+		this.firstName = firstName;
+	}
+
 }

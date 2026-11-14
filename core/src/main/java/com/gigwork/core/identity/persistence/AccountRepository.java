@@ -47,4 +47,16 @@ public class AccountRepository {
 		return true;
 	}
 
+	public Optional<String> findFirstName(UUID accountId) {
+		return accounts.findById(accountId).map(Account::getFirstName);
+	}
+
+	/** Sets the first name of an active account (an ordinary update, no invariant to protect). False if there is no such account. */
+	public boolean updateFirstName(UUID accountId, String firstName) {
+		return accounts.findById(accountId).filter(a -> Account.ACTIVE.equals(a.getStatus())).map(a -> {
+			a.setFirstName(firstName);
+			return true;
+		}).orElse(false);
+	}
+
 }
