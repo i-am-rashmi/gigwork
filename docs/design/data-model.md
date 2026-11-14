@@ -51,14 +51,14 @@ Name and contact details live in Identity. A home location outside every zone is
 
 | Entity | Key fields |
 | --- | --- |
-| Busy block | ID, Talent account ID, start, end, all-day flag, created at (private to the Talent) |
-| Booking | ID, Talent account ID, gig ID, start, end (the gig's times), status (active / cancelled), created at |
+| Busy block | ID, Talent account ID, period (start inclusive, end exclusive), all-day flag, first and last date (inclusive, only for all-day blocks), created at (private to the Talent) |
+| Booking | ID, Talent account ID, gig ID, period (the gig's times; start inclusive, end exclusive), status (active / cancelled), created at, cancelled at |
 
 Busy blocks and bookings are separate because they follow different rules: bookings must never overlap each other, while busy blocks are hints used for matching and warnings and never block a hire.
 
 **Access patterns:** insert a booking with an atomic overlap check (hire confirmation); check whether anything overlaps a time range for one Talent (apply warning); list a Talent's blocks and bookings in a date range (calendar); in Phase 3, check many Talent for one date (search).
 
-**Guarantees:** no two active bookings for one Talent overlap, enforced by the database even under simultaneous requests (NFR-14, FR-29); end after start.
+**Guarantees:** no two active bookings for one Talent overlap, enforced by the database even under simultaneous requests (NFR-14, FR-29); ranges are half-open, `[start, end)`, so back-to-back gigs (10:00–14:00 and 14:00–18:00) do not overlap; a gig has at most one active booking; end after start. An all-day block is stored as the range from midnight of its first date to midnight after its last date in the Talent's city time zone, and keeps its dates for display; a Talent who later moves city keeps the stored range. A Talent has at most 200 upcoming busy blocks, counted under a per-Talent lock so simultaneous adds cannot exceed it. Busy blocks are never shown to anyone but the Talent.
 
 **Volume:** about 2.5 million rows at design scale.
 
@@ -69,7 +69,7 @@ Busy blocks and bookings are separate because they follow different rules: booki
 | Category | ID, name, slug, status (live / retired), allowed work modes, language relevant (yes / no), display order |
 | Specialisation | ID, category ID, slug, name, status (live / retired), display order |
 | Language | code (ISO 639), name, status (live / retired), display order |
-| City | ID, name, status (live / not live) |
+| City | ID, name, status (live / not live), time zone (IANA name, e.g. Asia/Kolkata) |
 | Zone | ID, city ID, name, boundary (a shape on the map) |
 | Locality | ID, source ID, name, PIN code (may be empty), city ID, zone ID, centre point (seeded from a public dataset) |
 
