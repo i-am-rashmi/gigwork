@@ -27,12 +27,17 @@ def _dist(a: dict, b: dict) -> float:
     return math.hypot(a["x"] - b["x"], a["y"] - b["y"])
 
 
+def _is_node(p: dict) -> bool:
+    osm = p.get("osm", "")
+    return osm.startswith("node/") or not osm
+
+
 def dedupe(places: list[dict], within_m: float) -> tuple[list[dict], list[MergeGroup]]:
     """Merge places with the same normalised name (case-insensitive) that are within `within_m`.
 
     Groups are connected components (single linkage), so a chain A-B-C merges even if A-C > within_m;
     that is exactly why `MergeGroup.max_pairwise_m` is reported. The merged place sits at the centroid
-    of its members and takes the most common spelling (ties: alphabetically first). Output is sorted
+    of its nodes (or of all members when it has none) and takes the most common spelling (ties: alphabetically first). Output is sorted
     by (name, x, y) and does not depend on input order.
     """
     by_key: dict[str, list[dict]] = {}
@@ -61,10 +66,13 @@ def dedupe(places: list[dict], within_m: float) -> tuple[list[dict], list[MergeG
         for comp in comps.values():
             counts = Counter(m["name"] for m in comp)
             name = sorted(counts, key=lambda n: (-counts[n], n))[0]
+            # A node is the mapper's label point; a way/relation "center" is only a bounding-box middle.
+            # So when a group has nodes, only they place it; otherwise fall back to all members.
+            pool = [m for m in comp if _is_node(m)] or comp
             rec = {
                 "name": name,
-                "x": sum(m["x"] for m in comp) / len(comp),
-                "y": sum(m["y"] for m in comp) / len(comp),
+                "x": sum(m["x"] for m in pool) / len(pool),
+                "y": sum(m["y"] for m in pool) / len(pool),
                 "place": sorted(m["place"] for m in comp)[0],
                 "merged": len(comp),
                 "osm_ids": sorted(m["osm"] for m in comp if m.get("osm")),

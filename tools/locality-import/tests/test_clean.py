@@ -112,3 +112,18 @@ def test_prefixed_name_merges_with_existing_duplicate_after_dedupe_and_keeps_osm
     assert sorted(p["name"] for p in merged) == ["Jayanagar", "Jayanagar 4th Block"] and groups[0].count == 2
     block = [m for m in merged if m["name"] == "Jayanagar 4th Block"][0]
     assert len(block["osm_ids"]) == 2
+
+
+def test_merged_place_uses_node_coordinates_not_group_centroid():
+    node = {**P("Sector 1", 0, 0), "osm": "node/1"}
+    rel = {**P("Sector 1", 600, 0), "osm": "relation/2"}
+    merged, groups = clean.dedupe([rel, node], 1000)
+    assert (merged[0]["x"], merged[0]["y"]) == (0, 0) and merged[0]["osm_ids"] == ["node/1", "relation/2"]
+    assert groups[0].max_pairwise_m == 600
+
+
+def test_two_nodes_and_a_relation_use_the_node_centroid_and_relation_alone_is_used_if_no_node():
+    a, b = {**P("X", 0, 0), "osm": "node/1"}, {**P("X", 200, 0), "osm": "node/2"}
+    r = {**P("X", 900, 0), "osm": "relation/3"}
+    assert clean.dedupe([a, b, r], 1000)[0][0]["x"] == 100
+    assert clean.dedupe([r, {**P("X", 1_500, 0), "osm": "way/4"}], 1000)[0][0]["x"] == 900
