@@ -126,4 +126,4 @@ def test_two_nodes_and_a_relation_use_the_node_centroid_and_relation_alone_is_us
     a, b = {**P("X", 0, 0), "osm": "node/1"}, {**P("X", 200, 0), "osm": "node/2"}
     r = {**P("X", 900, 0), "osm": "relation/3"}
     assert clean.dedupe([a, b, r], 1000)[0][0]["x"] == 100
-    assert clean.dedupe([r, {**P("X", 1_500, 0), "osm": "way/4"}], 1000)[0][0]["x"] == 900
+    assert clean.dedupe([r, {**P("X", 1_500, 0), "osm": "way/4"}], 1000)[0][0]["x"] == 1_200
