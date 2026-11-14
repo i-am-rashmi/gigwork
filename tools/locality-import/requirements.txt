@@ -1,0 +1,7 @@
+geopandas==1.2.0
+shapely==2.2.0
+pyproj==3.8.0
+requests==2.34.2
+folium==0.20.0
+topojson==2.2
+pytest==9.2.0
