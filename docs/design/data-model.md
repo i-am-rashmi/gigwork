@@ -116,14 +116,15 @@ Prompts and the evaluation set live in the repository, not the database.
 
 | Entity | Key fields |
 | --- | --- |
-| Application | ID, gig ID, Talent account ID, note, status (active / withdrawn), applied at, busy warning shown |
+| Application | ID, gig ID, Talent account ID, Poster account ID (copied from the gig; never changes), note, status (active / withdrawn), applied at (latest submission), withdrawn at, busy warning shown, created at |
+| Application submission | ID, Talent account ID, application ID, submitted at (append-only: one row per submission, including re-applies) |
 | Shortlist entry | application ID, shortlisted at, removed at, Poster shares contact, Talent consent given at, consent withdrawn at |
 | Hire | ID, gig ID, application ID, started by (Poster / Talent), status (pending / confirmed / lapsed / declined / withdrawn / cancelled), started at, confirmed at, cancelled at, cancelled by, cancel reason, booking ID |
 | Contact access log | ID, viewer account ID, viewed account ID, gig ID, viewed at (kept 1 year) |
 
-**Access patterns:** insert an application and count a Talent's applications today (limit 30); list applications by gig (Poster) and by Talent (dashboard tabs); shortlist with counts per gig (10) and per Poster per day (20); check shortlist and consent by gig, viewer and viewed account on every contact view, then log it; insert a pending hire; find pending hires older than 24 hours (lapse job); shortlists and hires per Poster over time (abuse detection).
+**Access patterns:** insert or reactivate an application and count a Talent's submissions in the last 24 hours (limit 30, under a per-Talent lock); list a gig's active applications oldest first (Poster) and a Talent's applications newest first (dashboard tabs); shortlist with counts per gig (10) and per Poster per day (20); check shortlist and consent by gig, viewer and viewed account on every contact view, then log it; insert a pending hire; find pending hires older than 24 hours (lapse job); shortlists and hires per Poster over time (abuse detection).
 
-**Guarantees:** one application per Talent per gig; at most 10 shortlisted per gig, even under concurrency; contacts visible only while shortlisted and consented; at most one pending hire per gig at a time; at most one confirmed hire per gig (together with the conditional FILLED update in Gigs).
+**Guarantees:** one application per Talent per gig; applying again after a withdrawal reactivates the same application; every submission is logged, so apply/withdraw loops still count towards the daily limit, and the limit holds under simultaneous requests; a submission row is never updated (it is deleted only by retention and account erasure); a withdrawn application has a withdrawn time and an active one does not; at most 10 shortlisted per gig, even under concurrency; contacts visible only while shortlisted and consented; at most one pending hire per gig at a time; at most one confirmed hire per gig (together with the conditional FILLED update in Gigs).
 
 **Volume:** about 15,000 applications a day per city, around 5 million a year per city; the largest growing dataset in the core. Kept for history, anonymised on account erasure.
 
