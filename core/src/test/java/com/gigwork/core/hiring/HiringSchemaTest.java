@@ -27,6 +27,7 @@ class HiringSchemaTest {
 
 	@AfterEach
 	void cleanUp() {
+		jdbc.sql("DELETE FROM hiring.hire WHERE talent_id = :t").param("t", talent).update();
 		jdbc.sql("DELETE FROM hiring.shortlist_action WHERE poster_id = :t").param("t", poster).update();
 		jdbc.sql("DELETE FROM hiring.shortlist_entry WHERE poster_id = :t").param("t", poster).update();
 		jdbc.sql("DELETE FROM hiring.contact_access_log WHERE viewer_id = :t").param("t", poster).update();
@@ -173,6 +174,100 @@ class HiringSchemaTest {
 		}
 		assertThat(jdbc.sql("SELECT indexdef FROM pg_indexes WHERE indexname = 'shortlist_entry_gig_current'").query(String.class).single())
 				.contains("removed_at IS NULL");
+	}
+
+	// ---- hires ---------------------------------------------------------------------------------------------------------------
+
+	private int hire(UUID gigId, UUID applicationId, String status, String confirmed, String ended, String cancelledBy, String reason,
+			boolean booking) {
+		return jdbc.sql("""
+				INSERT INTO hiring.hire (id, gig_id, application_id, talent_id, poster_id, started_by, status, started_at, expires_at,
+				    confirmed_at, ended_at, cancelled_by, cancel_reason, booking_id)
+				VALUES (gen_random_uuid(), :g, :a, :t, :p, 'POSTER', :status, TIMESTAMPTZ '2030-01-01 10:00+00',
+				    TIMESTAMPTZ '2030-01-02 10:00+00', CAST(:c AS timestamptz), CAST(:e AS timestamptz), :cb, :r,
+				    CASE WHEN :b THEN gen_random_uuid() END)""")
+				.param("g", gigId).param("a", applicationId).param("t", talent).param("p", poster).param("status", status)
+				.param("c", confirmed).param("e", ended).param("cb", cancelledBy).param("r", reason).param("b", booking).update();
+	}
+
+	@Test
+	void eachHireStatusHasItsOwnShape() {
+		UUID application = anApplication();
+		UUID g1 = UUID.randomUUID();
+		assertThat(hire(g1, application, "PENDING", null, null, null, null, false)).isEqualTo(1);
+		assertThat(hire(UUID.randomUUID(), application, "CONFIRMED", "2030-01-01 11:00+00", null, null, null, true)).isEqualTo(1);
+		assertThat(hire(UUID.randomUUID(), application, "LAPSED", null, "2030-01-02 10:00+00", null, null, false)).isEqualTo(1);
+		assertThat(hire(UUID.randomUUID(), application, "DECLINED", null, "2030-01-01 12:00+00", null, null, false)).isEqualTo(1);
+		assertThat(hire(UUID.randomUUID(), application, "WITHDRAWN", null, "2030-01-01 12:00+00", null, null, false)).isEqualTo(1);
+		assertThat(hire(UUID.randomUUID(), application, "CANCELLED", "2030-01-01 11:00+00", "2030-01-01 13:00+00", "TALENT", "Ill", true)).isEqualTo(1);
+
+		String[][] broken = {
+				{ "PENDING", "2030-01-01 11:00+00", null, null, null }, // pending but confirmed
+				{ "PENDING", null, "2030-01-01 11:00+00", null, null }, // pending but ended
+				{ "CONFIRMED", null, null, null, null }, // confirmed without a time
+				{ "CONFIRMED", "2030-01-01 11:00+00", "2030-01-01 12:00+00", null, null }, // confirmed but ended
+				{ "LAPSED", null, null, null, null }, // lapsed without an end
+				{ "DECLINED", "2030-01-01 11:00+00", "2030-01-01 12:00+00", null, null }, // declined after confirming
+				{ "CANCELLED", null, "2030-01-01 12:00+00", "POSTER", "x" }, // cancelled but never confirmed
+				{ "CANCELLED", "2030-01-01 11:00+00", "2030-01-01 12:00+00", null, "x" }, // cancelled by nobody
+				{ "WITHDRAWN", null, "2030-01-01 12:00+00", "POSTER", "x" }, // a reason only goes with a cancellation
+		};
+		for (String[] b : broken) {
+			boolean booking = "CONFIRMED".equals(b[0]) || "CANCELLED".equals(b[0]);
+			assertThatThrownBy(() -> hire(UUID.randomUUID(), application, b[0], b[1], b[2], b[3], b[4], booking))
+					.as(String.join(",", java.util.Arrays.stream(b).map(String::valueOf).toList())).isInstanceOf(DataIntegrityViolationException.class);
+		}
+		assertThatThrownBy(() -> hire(UUID.randomUUID(), application, "CONFIRMED", "2030-01-01 11:00+00", null, null, null, false))
+				.as("confirmed without a booking").isInstanceOf(DataIntegrityViolationException.class);
+	}
+
+	@Test
+	void aStatusStartedByCancelledByAndReasonMustBeValid() {
+		UUID application = anApplication();
+		assertThatThrownBy(() -> hire(UUID.randomUUID(), application, "HIRED", null, null, null, null, false))
+				.isInstanceOf(DataIntegrityViolationException.class);
+		assertThatThrownBy(() -> hire(UUID.randomUUID(), application, "CANCELLED", "2030-01-01 11:00+00", "2030-01-01 12:00+00", "ADMIN", "x", true))
+				.isInstanceOf(DataIntegrityViolationException.class);
+		assertThatThrownBy(() -> hire(UUID.randomUUID(), application, "CANCELLED", "2030-01-01 11:00+00", "2030-01-01 12:00+00", "TALENT", "x".repeat(501), true))
+				.isInstanceOf(DataIntegrityViolationException.class);
+		assertThatThrownBy(() -> hire(UUID.randomUUID(), application, "CANCELLED", "2030-01-01 11:00+00", "2030-01-01 12:00+00", "TALENT", "", true))
+				.isInstanceOf(DataIntegrityViolationException.class);
+		assertThatThrownBy(() -> jdbc.sql("""
+				INSERT INTO hiring.hire (id, gig_id, application_id, talent_id, poster_id, started_by, status, started_at, expires_at)
+				VALUES (gen_random_uuid(), gen_random_uuid(), :a, :t, :p, 'ADMIN', 'PENDING', now(), now() + interval '1 day')""")
+				.param("a", application).param("t", talent).param("p", poster).update()).isInstanceOf(DataIntegrityViolationException.class);
+		assertThatThrownBy(() -> jdbc.sql("""
+				INSERT INTO hiring.hire (id, gig_id, application_id, talent_id, poster_id, started_by, status, started_at, expires_at)
+				VALUES (gen_random_uuid(), gen_random_uuid(), :a, :t, :p, 'POSTER', 'PENDING', now(), now())""")
+				.param("a", application).param("t", talent).param("p", poster).update())
+				.as("expires at the moment it starts").isInstanceOf(DataIntegrityViolationException.class);
+	}
+
+	@Test
+	void aGigHasAtMostOnePendingAndOneConfirmedHireButAnyNumberOfEndedOnes() {
+		UUID application = anApplication();
+		UUID gigId = UUID.randomUUID();
+		assertThat(hire(gigId, application, "PENDING", null, null, null, null, false)).isEqualTo(1);
+		assertThatThrownBy(() -> hire(gigId, application, "PENDING", null, null, null, null, false)).isInstanceOf(DataIntegrityViolationException.class);
+		assertThat(hire(gigId, application, "DECLINED", null, "2030-01-01 12:00+00", null, null, false)).isEqualTo(1);
+		assertThat(hire(gigId, application, "LAPSED", null, "2030-01-02 10:00+00", null, null, false)).isEqualTo(1);
+
+		UUID other = UUID.randomUUID();
+		assertThat(hire(other, application, "CONFIRMED", "2030-01-01 11:00+00", null, null, null, true)).isEqualTo(1);
+		assertThatThrownBy(() -> hire(other, application, "CONFIRMED", "2030-01-01 11:00+00", null, null, null, true))
+				.isInstanceOf(DataIntegrityViolationException.class);
+		assertThat(hire(other, application, "CANCELLED", "2030-01-01 11:00+00", "2030-01-01 13:00+00", "POSTER", "x", true)).isEqualTo(1);
+		assertThat(hire(gigId, application, "CONFIRMED", "2030-01-01 11:00+00", null, null, null, true)).as("pending and confirmed together").isEqualTo(1);
+	}
+
+	@Test
+	void aHireBelongsToAnApplicationAndTheLapseSweepHasItsIndex() {
+		assertThatThrownBy(() -> hire(UUID.randomUUID(), UUID.randomUUID(), "PENDING", null, null, null, null, false))
+				.isInstanceOf(DataIntegrityViolationException.class);
+		assertThat(jdbc.sql("SELECT indexdef FROM pg_indexes WHERE indexname = 'hire_pending_expiry'").query(String.class).single())
+				.contains("(expires_at)").contains("status = 'PENDING'");
+		assertThat(jdbc.sql("SELECT indexdef FROM pg_indexes WHERE indexname = 'hire_by_application'").query(String.class).single())
+				.contains("application_id, started_at DESC");
 	}
 
 }
