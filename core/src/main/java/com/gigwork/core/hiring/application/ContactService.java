@@ -1,6 +1,7 @@
 package com.gigwork.core.hiring.application;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,9 +12,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.gigwork.core.gigs.GigLookup;
 import com.gigwork.core.gigs.GigState;
+import com.gigwork.core.gigs.GigSummary;
 import com.gigwork.core.hiring.domain.ApplicationNotFoundException;
 import com.gigwork.core.hiring.domain.ContactNotAvailableException;
+import com.gigwork.core.hiring.config.HiringProperties;
 import com.gigwork.core.hiring.persistence.ApplicationStore;
+import com.gigwork.core.hiring.persistence.HireStore;
 import com.gigwork.core.hiring.persistence.ShortlistStore;
 import com.gigwork.core.hiring.persistence.ShortlistStore.Entry;
 import com.gigwork.core.hiring.persistence.StoredApplication;
@@ -40,15 +44,19 @@ public class ContactService {
 
 	private final ApplicationStore applications;
 	private final ShortlistStore store;
+	private final HireStore hires;
+	private final HiringProperties properties;
 	private final GigLookup gigs;
 	private final ContactMethods contactMethods;
 	private final TransactionTemplate transaction;
 	private final Clock clock;
 
-	ContactService(ApplicationStore applications, ShortlistStore store, GigLookup gigs, ContactMethods contactMethods,
-			TransactionTemplate transaction, Clock clock) {
+	ContactService(ApplicationStore applications, ShortlistStore store, HireStore hires, HiringProperties properties,
+			GigLookup gigs, ContactMethods contactMethods, TransactionTemplate transaction, Clock clock) {
 		this.applications = applications;
 		this.store = store;
+		this.hires = hires;
+		this.properties = properties;
 		this.gigs = gigs;
 		this.contactMethods = contactMethods;
 		this.transaction = transaction;
@@ -76,12 +84,27 @@ public class ContactService {
 					.orElseThrow(ContactNotAvailableException::new);
 			StoredApplication application = applications.find(applicationId).filter(StoredApplication::isActive)
 					.orElseThrow(ContactNotAvailableException::new);
-			gigs.find(application.gigId()).filter(g -> g.status() == GigState.OPEN)
-					.orElseThrow(ContactNotAvailableException::new);
+			GigSummary gig = gigs.find(application.gigId()).orElseThrow(ContactNotAvailableException::new);
+			if (!gigAllowsViews(gig, applicationId, now)) {
+				throw new ContactNotAvailableException();
+			}
 			ContactCard card = contactMethods.contactCard(viewedId).orElseThrow(ContactNotAvailableException::new);
 			store.logView(viewerId, viewedId, entry.gigId(), applicationId, now); // if this fails, nothing is returned
 			return reveal(card);
 		});
+	}
+
+	/**
+	 * Contacts can be viewed while the gig is open. Once it is filled, only the hired pair can, while their hire is
+	 * confirmed and until {@code hiredContactDaysAfterGig} days after the gig ends; the other shortlisted Talent lose
+	 * access when the gig is filled (FR-26). A gig that is cancelled or expired never allows a view.
+	 */
+	private boolean gigAllowsViews(GigSummary gig, UUID applicationId, Instant now) {
+		if (gig.status() == GigState.OPEN) {
+			return true;
+		}
+		return gig.status() == GigState.FILLED && hires.lockConfirmedOfApplication(applicationId).isPresent()
+				&& now.isBefore(gig.endAt().plus(Duration.ofDays(properties.hiredContactDaysAfterGig())));
 	}
 
 	private static ContactView reveal(ContactCard card) {

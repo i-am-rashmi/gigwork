@@ -21,6 +21,12 @@ spring:
     virtual:
       enabled: true   # Java 21 virtual threads for request handling
 
+  modulith:
+    events:
+      # events between modules are stored with the change that caused them; any not completed when the app stopped
+      # are delivered again on start (listeners must be idempotent), and the resubmission job retries failed ones
+      republish-outstanding-events-on-restart: true
+
 gigwork:
   identity:
     # Secrets have no value here on purpose (NFR-45). Outside the local and test profiles set, from the
@@ -38,6 +44,10 @@ gigwork:
 
   jobs:
     enabled: true   # ADR-0010: false turns every scheduled job off (tests call the job methods directly)
+
+  platform:
+    events:
+      resubmit-older-than: 2m   # the resubmission job (every 5 minutes) retries events whose listener has not completed after this long
 
   reference:
     location:

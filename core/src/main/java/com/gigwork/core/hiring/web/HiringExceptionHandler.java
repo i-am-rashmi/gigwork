@@ -14,6 +14,12 @@ import com.gigwork.core.hiring.domain.ApplicationNotActiveException;
 import com.gigwork.core.hiring.domain.ContactMethodRequiredException;
 import com.gigwork.core.hiring.domain.ContactNotAvailableException;
 import com.gigwork.core.hiring.domain.GigNotOpenException;
+import com.gigwork.core.hiring.domain.HireAlreadyPendingException;
+import com.gigwork.core.hiring.domain.HireBookingConflictException;
+import com.gigwork.core.hiring.domain.HireInProgressException;
+import com.gigwork.core.hiring.domain.HireNotConfirmedException;
+import com.gigwork.core.hiring.domain.HireNotPendingException;
+import com.gigwork.core.hiring.domain.HireWrongSideException;
 import com.gigwork.core.hiring.domain.NotShortlistedException;
 import com.gigwork.core.hiring.domain.ShortlistActionLimitException;
 import com.gigwork.core.hiring.domain.ShortlistFullException;
@@ -33,7 +39,7 @@ import com.gigwork.core.hiring.domain.ProfileNotActiveException;
  * is 429. The messages are for the user.
  */
 @RestControllerAdvice(assignableTypes = { ApplicationController.class, ApplicationListController.class, ShortlistController.class,
-		ContactController.class })
+		ContactController.class, HireController.class })
 class HiringExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(InvalidApplicationException.class)
@@ -122,6 +128,36 @@ class HiringExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(ContactNotAvailableException.class)
 	ProblemDetail contactNotAvailable(ContactNotAvailableException ex) {
 		return problem(HttpStatus.CONFLICT, "Contact not available", ex.getMessage(), "CONTACT_NOT_AVAILABLE");
+	}
+
+	@ExceptionHandler(HireInProgressException.class)
+	ProblemDetail hireInProgress(HireInProgressException ex) {
+		return problem(HttpStatus.CONFLICT, "Hire in progress", ex.getMessage(), "HIRE_IN_PROGRESS");
+	}
+
+	@ExceptionHandler(HireNotPendingException.class)
+	ProblemDetail hireNotPending(HireNotPendingException ex) {
+		return problem(HttpStatus.CONFLICT, "Hire not pending", ex.getMessage(), "HIRE_NOT_PENDING");
+	}
+
+	@ExceptionHandler(HireNotConfirmedException.class)
+	ProblemDetail hireNotConfirmed(HireNotConfirmedException ex) {
+		return problem(HttpStatus.CONFLICT, "Hire not confirmed", ex.getMessage(), "HIRE_NOT_CONFIRMED");
+	}
+
+	@ExceptionHandler(HireAlreadyPendingException.class)
+	ProblemDetail hireAlreadyPending(HireAlreadyPendingException ex) {
+		return problem(HttpStatus.CONFLICT, "Hire already pending", ex.getMessage(), "HIRE_ALREADY_PENDING");
+	}
+
+	@ExceptionHandler(HireWrongSideException.class)
+	ProblemDetail hireWrongSide(HireWrongSideException ex) {
+		return problem(HttpStatus.CONFLICT, "Not for you to do", ex.getMessage(), "HIRE_WRONG_SIDE");
+	}
+
+	@ExceptionHandler(HireBookingConflictException.class)
+	ProblemDetail hireBookingConflict(HireBookingConflictException ex) {
+		return problem(HttpStatus.CONFLICT, "Already booked", ex.getMessage(), "BOOKING_CONFLICT");
 	}
 
 	@ExceptionHandler(ApplyLimitReachedException.class)

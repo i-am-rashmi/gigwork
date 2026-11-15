@@ -140,6 +140,41 @@ public final class HiringApiSupport {
 		return mvc.perform(auth(get("/v1/applications/" + applicationId + "/poster-contact"), talent));
 	}
 
+	public ResultActions startHire(TestAccount account, UUID applicationId) throws Exception {
+		return mvc.perform(auth(post("/v1/applications/" + applicationId + "/hire"), account));
+	}
+
+	public ResultActions confirmHire(TestAccount account, UUID hireId) throws Exception {
+		return mvc.perform(auth(post("/v1/hires/" + hireId + "/confirm"), account));
+	}
+
+	public ResultActions declineHire(TestAccount account, UUID hireId) throws Exception {
+		return mvc.perform(auth(post("/v1/hires/" + hireId + "/decline"), account));
+	}
+
+	public ResultActions withdrawHire(TestAccount account, UUID hireId) throws Exception {
+		return mvc.perform(auth(post("/v1/hires/" + hireId + "/withdraw"), account));
+	}
+
+	public ResultActions cancelHire(TestAccount account, UUID hireId, String body) throws Exception {
+		return mvc.perform(auth(post("/v1/hires/" + hireId + "/cancel"), account).contentType(MediaType.APPLICATION_JSON).content(body));
+	}
+
+	public ResultActions hire(TestAccount account, UUID hireId) throws Exception {
+		return mvc.perform(auth(get("/v1/hires/" + hireId), account));
+	}
+
+	/** A Talent who applied to the gig and is shortlisted by its Poster; returns [talent, applicationId]. */
+	public Shortlisted shortlisted(TestAccount poster, UUID gigId, String firstName) throws Exception {
+		TestAccount talent = talent(firstName, "photographer");
+		UUID application = applyOk(talent, gigId);
+		shortlist(poster, application, false).andExpect(status().isOk());
+		return new Shortlisted(talent, application);
+	}
+
+	public record Shortlisted(TestAccount talent, UUID application) {
+	}
+
 	private static MockHttpServletRequestBuilder auth(MockHttpServletRequestBuilder request, TestAccount account) {
 		return account == null ? request : request.header("Authorization", account.header());
 	}

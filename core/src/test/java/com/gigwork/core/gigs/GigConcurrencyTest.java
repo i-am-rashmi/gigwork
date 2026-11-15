@@ -112,7 +112,7 @@ class GigConcurrencyTest {
 		CountDownLatch editIsWaiting = new CountDownLatch(1);
 
 		CompletableFuture<Boolean> cancel = CompletableFuture.supplyAsync(() -> transaction.execute(status -> {
-			boolean done = store.cancel(gig.id(), poster.id(), null, clock.instant());
+			boolean done = store.cancel(gig.id(), poster.id(), null, clock.instant()).isPresent();
 			cancelHoldsTheRow.countDown();
 			await(editIsWaiting);
 			sleep(300); // the edit is blocked on the row lock, as far as a test can tell
@@ -147,7 +147,7 @@ class GigConcurrencyTest {
 		await(editHoldsTheRow);
 		CompletableFuture<Boolean> cancel = CompletableFuture.supplyAsync(() -> {
 			cancelIsWaiting.countDown();
-			return transaction.execute(status -> store.cancel(gig.id(), poster.id(), "late", clock.instant()));
+			return transaction.execute(status -> store.cancel(gig.id(), poster.id(), "late", clock.instant()).isPresent());
 		});
 
 		assertThat(edit.get(30, TimeUnit.SECONDS)).isPresent();

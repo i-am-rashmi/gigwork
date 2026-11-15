@@ -104,6 +104,27 @@ public class ApplicationStore {
 				.optional();
 	}
 
+	/**
+	 * Locks the application row FOR SHARE and reads it afterwards, so the answer is what is committed now: a hire may
+	 * start only for an application nobody is withdrawing at this moment (that needs FOR UPDATE and waits for us).
+	 */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public Optional<StoredApplication> lockForShare(UUID id) {
+		return jdbc.sql("SELECT " + COLUMNS + " FROM hiring.application WHERE id = :id FOR SHARE").param("id", id)
+				.query(ApplicationStore::map).optional();
+	}
+
+	/**
+	 * Locks the application row FOR UPDATE and reads it afterwards. Withdrawing an application and removing its Talent
+	 * from the shortlist take this lock, then check for a hire in a separate statement (never inside the UPDATE, whose
+	 * subquery would see the snapshot from before the wait), then change.
+	 */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public Optional<StoredApplication> lockForUpdate(UUID id) {
+		return jdbc.sql("SELECT " + COLUMNS + " FROM hiring.application WHERE id = :id FOR UPDATE").param("id", id)
+				.query(ApplicationStore::map).optional();
+	}
+
 	public Optional<Owner> owner(UUID id) {
 		return jdbc.sql("SELECT talent_id, status FROM hiring.application WHERE id = :id").param("id", id)
 				.query((rs, i) -> new Owner(rs.getObject("talent_id", UUID.class), rs.getString("status"))).optional();

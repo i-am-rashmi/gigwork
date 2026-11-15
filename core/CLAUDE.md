@@ -32,7 +32,7 @@ The base package holds only the module's public API. Result records that never l
 - Refer to another module's data **by ID only**. No JPA relationships (`@ManyToOne` etc.) across modules.
 - Module APIs take and return their own **records/DTOs**, never internal entities.
 - Need an answer now (or same transaction) → call the other module's public service.
-- Can happen a moment later → publish an event with `ApplicationEventPublisher`; listen with `@ApplicationModuleListener`. Listeners must be idempotent.
+- Can happen a moment later → publish an event with `ApplicationEventPublisher`; listen with `@ApplicationModuleListener`. **Listeners must be idempotent, because events can be delivered again**: the registry redelivers an event when the app restarted before its listener completed (`republish-outstanding-events-on-restart`), and a Platform job (`EventResubmission`, every 5 minutes, ShedLock) resubmits events whose listener failed and stayed incomplete for 2 minutes, so a failed listener is retried until it works. Make each handler a conditional update that finds nothing to do the second time, and publish its own events only from the branch that changed a row. Test it by delivering the same event twice, and by making the listener fail once and running the resubmission.
 - Events that leave the core (to Kafka) go **only** through the platform module's outbox, never straight to Kafka.
 - Never query another module's tables, including in native SQL.
 
@@ -47,6 +47,7 @@ The base package holds only the module's public API. Result records that never l
 - Invariants belong in the database where possible (ADR-0002): unique constraints, partial unique indexes, the exclusion constraint for overlapping bookings, conditional updates such as `UPDATE ... WHERE status = 'OPEN'`. Don't replace these with check-then-act code.
 - Code that may be refused by a database constraint, as an expected answer (a booking that overlaps), must not ruin the caller's transaction: PostgreSQL aborts a transaction after a failed statement. Spring's JPA transaction manager cannot do `PROPAGATION_NESTED` with Hibernate, so take a JDBC savepoint on the transaction's connection (`DataSourceUtils.getConnection`), as `BookingService` does, and throw only after the transaction block ends. Simultaneous inserts into an exclusion constraint can deadlock; serialise them per owner with `pg_advisory_xact_lock` (the constraint still decides).
 - Shortlist limits are protected by the per-Poster lock alone; a gig has one Poster, so it also covers the per-gig count. If gigs ever get several Posters, add a gig lock and always take the Poster lock first.
+- **Row lock order in Hiring: application, hire, gig, booking, always.** A request that locks an application row (`FOR SHARE` to start a hire, `FOR UPDATE` to withdraw it or remove the Talent from the shortlist) does so first, then the hire row, then calls Gigs (hold, fill, release) and Availability. After taking the application row lock, check the other table in a *separate* statement, never as a `NOT EXISTS` inside the UPDATE (its subquery would use the snapshot from before the wait). That is why a hire is inserted before the gig is held.
 - IDs are random UUIDs, never sequences (NFR-33). City-local rows carry `city_id`.
 
 ## Scheduled jobs (ADR-0010)

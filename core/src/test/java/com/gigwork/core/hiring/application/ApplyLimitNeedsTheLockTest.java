@@ -52,24 +52,28 @@ class ApplyLimitNeedsTheLockTest {
 		clock.reset();
 		HiringApiSupport api = new HiringApiSupport(mvc, reference, accounts, clock);
 		TestAccount poster = accounts.create();
-		TestAccount talent = api.talent("Asha", "photographer");
-		List<Callable<Boolean>> tasks = new ArrayList<>();
-		for (int i = 0; i < 20; i++) {
-			UUID gig = api.openGig(poster);
-			tasks.add(() -> {
-				try {
-					applying.apply(talent.id(), gig, null, false);
-					return true;
-				}
-				catch (RuntimeException e) {
-					return false;
-				}
-			});
+		// Without the lock the outcome depends on timing, so a round that happens to run the applies one after the
+		// other proves nothing; it takes only one round where they overlap to show the limit is gone.
+		long best = 0;
+		for (int round = 0; round < 5 && best <= 5; round++) {
+			TestAccount talent = api.talent("Asha" + round, "photographer");
+			List<Callable<Boolean>> tasks = new ArrayList<>();
+			for (int i = 0; i < 20; i++) {
+				UUID gig = api.openGig(poster);
+				tasks.add(() -> {
+					try {
+						applying.apply(talent.id(), gig, null, false);
+						return true;
+					}
+					catch (RuntimeException e) {
+						return false;
+					}
+				});
+			}
+			best = Math.max(best, Concurrently.runAll(tasks).stream().filter(Boolean::booleanValue).count());
 		}
 
-		List<Boolean> results = Concurrently.runAll(tasks);
-
-		assertThat(results.stream().filter(Boolean::booleanValue).count()).as("applies that got past a limit of 5").isGreaterThan(5);
+		assertThat(best).as("applies that got past a limit of 5").isGreaterThan(5);
 	}
 
 }

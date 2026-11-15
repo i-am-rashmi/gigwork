@@ -113,7 +113,8 @@ class GigController {
 		return GigResponse.of(gigs.edit(CurrentAccount.required(), id, draft(request)));
 	}
 
-	@Operation(summary = "Cancel an open gig", description = "Gigs are never deleted; a cancelled gig is kept.")
+	@Operation(summary = "Cancel an open or filled gig",
+			description = "Gigs are never deleted; a cancelled gig is kept. Cancelling a filled gig also cancels its hire and releases the Talent's booking.")
 	@ApiResponse(responseCode = "404", description = "No such gig, or it is not yours")
 	@ApiResponse(responseCode = "409", description = "The gig is no longer open")
 	@PostMapping("/{id}/cancel")

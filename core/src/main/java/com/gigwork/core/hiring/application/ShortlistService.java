@@ -18,10 +18,12 @@ import com.gigwork.core.hiring.domain.ApplicationNotActiveException;
 import com.gigwork.core.hiring.domain.ApplicationNotFoundException;
 import com.gigwork.core.hiring.domain.ContactMethodRequiredException;
 import com.gigwork.core.hiring.domain.GigNotOpenException;
+import com.gigwork.core.hiring.domain.HireInProgressException;
 import com.gigwork.core.hiring.domain.NotShortlistedException;
 import com.gigwork.core.hiring.domain.ShortlistActionLimitException;
 import com.gigwork.core.hiring.domain.ShortlistFullException;
 import com.gigwork.core.hiring.persistence.ApplicationStore;
+import com.gigwork.core.hiring.persistence.HireStore;
 import com.gigwork.core.hiring.persistence.ShortlistStore;
 import com.gigwork.core.hiring.persistence.StoredApplication;
 import com.gigwork.core.identity.ContactMethods;
@@ -42,6 +44,7 @@ public class ShortlistService {
 
 	private final ApplicationStore applications;
 	private final ShortlistStore store;
+	private final HireStore hires;
 	private final GigLookup gigs;
 	private final ContactMethods contactMethods;
 	private final ShortlistLocks locks;
@@ -50,11 +53,12 @@ public class ShortlistService {
 	private final ApplicationEventPublisher events;
 	private final Clock clock;
 
-	ShortlistService(ApplicationStore applications, ShortlistStore store, GigLookup gigs, ContactMethods contactMethods,
+	ShortlistService(ApplicationStore applications, ShortlistStore store, HireStore hires, GigLookup gigs, ContactMethods contactMethods,
 			ShortlistLocks locks, HiringProperties properties, TransactionTemplate transaction,
 			ApplicationEventPublisher events, Clock clock) {
 		this.applications = applications;
 		this.store = store;
+		this.hires = hires;
 		this.gigs = gigs;
 		this.contactMethods = contactMethods;
 		this.locks = locks;
@@ -108,12 +112,18 @@ public class ShortlistService {
 	 * Removes a Talent from the shortlist. No notification. Always allowed, whatever the daily limit.
 	 *
 	 * @throws NotShortlistedException the Talent is not currently shortlisted
+	 * @throws HireInProgressException the application has a pending or confirmed hire: end the hire first
 	 */
 	public void remove(UUID posterId, UUID applicationId) {
 		StoredApplication application = ownApplication(posterId, applicationId);
 		Instant now = clock.instant();
 		transaction.executeWithoutResult(status -> {
 			locks.lock(posterId);
+			// lock the application row, then look for a hire in a separate statement, then change (see HireService)
+			applications.lockForUpdate(applicationId);
+			if (hires.inProgress(applicationId)) {
+				throw new HireInProgressException();
+			}
 			if (!store.remove(applicationId, posterId, now)) {
 				throw new NotShortlistedException();
 			}

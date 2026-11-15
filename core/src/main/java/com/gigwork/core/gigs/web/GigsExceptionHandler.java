@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import com.gigwork.core.gigs.domain.GigHirePendingException;
 import com.gigwork.core.gigs.domain.GigNotFoundException;
 import com.gigwork.core.gigs.domain.GigNotOpenException;
 import com.gigwork.core.gigs.domain.InvalidGigException;
@@ -23,6 +24,11 @@ class GigsExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(GigNotFoundException.class)
 	ProblemDetail notFound(GigNotFoundException ex) {
 		return problem(HttpStatus.NOT_FOUND, "Gig not found", ex.getMessage());
+	}
+
+	@ExceptionHandler(GigHirePendingException.class)
+	ProblemDetail hirePending(GigHirePendingException ex) {
+		return problem(HttpStatus.CONFLICT, "Hire pending", ex.getMessage());
 	}
 
 	@ExceptionHandler(GigNotOpenException.class)

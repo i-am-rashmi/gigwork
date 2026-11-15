@@ -24,6 +24,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import com.gigwork.core.TestcontainersConfiguration;
 import com.gigwork.core.availability.Availability;
 import com.gigwork.core.availability.Conflicts;
+import com.gigwork.core.gigs.GigHiring;
 import com.gigwork.core.gigs.GigLookup;
 import com.gigwork.core.gigs.GigState;
 import com.gigwork.core.gigs.GigSummary;
@@ -34,6 +35,7 @@ import com.gigwork.core.hiring.domain.AlreadyAppliedException;
 import com.gigwork.core.hiring.domain.ProfileNotActiveException;
 import com.gigwork.core.identity.AccountNames;
 import com.gigwork.core.identity.ContactMethods;
+import com.gigwork.core.platform.JobRuns;
 import com.gigwork.core.profile.TalentEligibility;
 import com.gigwork.core.profile.TalentProfiles;
 
@@ -63,6 +65,10 @@ class HiringModuleTest {
 	ApplicationQueries queries;
 	@MockitoBean
 	GigLookup gigs;
+	@MockitoBean
+	GigHiring gigHiring;
+	@MockitoBean
+	JobRuns jobRuns;
 	@MockitoBean
 	TalentProfiles profiles;
 	@MockitoBean

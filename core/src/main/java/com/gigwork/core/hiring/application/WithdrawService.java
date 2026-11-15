@@ -12,9 +12,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.gigwork.core.hiring.ApplicationWithdrawn;
 import com.gigwork.core.hiring.domain.AlreadyWithdrawnException;
 import com.gigwork.core.hiring.domain.ApplicationNotFoundException;
+import com.gigwork.core.hiring.domain.HireInProgressException;
 import com.gigwork.core.hiring.persistence.ApplicationStore;
 import com.gigwork.core.hiring.persistence.ApplicationStore.Owner;
 import com.gigwork.core.hiring.persistence.ApplicationStore.Withdrawn;
+import com.gigwork.core.hiring.persistence.HireStore;
 import com.gigwork.core.hiring.persistence.ShortlistStore;
 
 /**
@@ -27,12 +29,15 @@ public class WithdrawService {
 
 	private final ApplicationStore store;
 	private final ShortlistStore shortlists;
+	private final HireStore hires;
 	private final TransactionTemplate transaction;
 	private final ApplicationEventPublisher events;
 	private final Clock clock;
 
-	WithdrawService(ApplicationStore store, ShortlistStore shortlists, TransactionTemplate transaction, ApplicationEventPublisher events, Clock clock) {
+	WithdrawService(ApplicationStore store, ShortlistStore shortlists, HireStore hires, TransactionTemplate transaction,
+			ApplicationEventPublisher events, Clock clock) {
 		this.store = store;
+		this.hires = hires;
 		this.shortlists = shortlists;
 		this.transaction = transaction;
 		this.events = events;
@@ -42,10 +47,17 @@ public class WithdrawService {
 	/**
 	 * @throws ApplicationNotFoundException unknown, or someone else's (never says which)
 	 * @throws AlreadyWithdrawnException the caller's own application is already withdrawn
+	 * @throws HireInProgressException the application has a pending or confirmed hire: end the hire first
 	 */
 	public void withdraw(UUID talentId, UUID applicationId) {
 		Instant now = clock.instant();
 		Boolean done = transaction.execute(status -> {
+			// lock the row, then look for a hire in a separate statement (which sees what a hire started a moment ago
+			// committed), then change: a hire that starts at the same time waits for this lock or is seen here
+			if (store.lockForUpdate(applicationId).filter(a -> a.talentId().equals(talentId)).isPresent()
+					&& hires.inProgress(applicationId)) {
+				throw new HireInProgressException();
+			}
 			Optional<Withdrawn> withdrawn = store.withdraw(applicationId, talentId, now);
 			withdrawn.ifPresent(w -> {
 				shortlists.endForWithdrawnApplication(applicationId, now); // access to contacts ends in the same transaction

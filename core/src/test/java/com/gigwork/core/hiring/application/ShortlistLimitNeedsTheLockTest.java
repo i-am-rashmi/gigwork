@@ -52,25 +52,30 @@ class ShortlistLimitNeedsTheLockTest {
 		clock.reset();
 		HiringApiSupport api = new HiringApiSupport(mvc, reference, accounts, clock);
 		TestAccount poster = accounts.create();
-		UUID gig = api.openGig(poster);
-		List<Callable<Boolean>> tasks = new ArrayList<>();
-		for (int i = 0; i < 10; i++) {
-			UUID application = api.applyOk(api.talent("T" + i, "photographer"), gig);
-			tasks.add(() -> {
-				try {
-					shortlists.shortlist(poster.id(), application, false);
-					return true;
-				}
-				catch (RuntimeException e) {
-					return false;
-				}
-			});
+		// Without the lock the outcome depends on timing: it takes one round where the shortlists overlap to show that
+		// the limit is gone, so up to five rounds are tried (each on its own gig).
+		int most = 0;
+		for (int round = 0; round < 5 && most <= 3; round++) {
+			UUID gig = api.openGig(poster);
+			List<Callable<Boolean>> tasks = new ArrayList<>();
+			for (int i = 0; i < 10; i++) {
+				UUID application = api.applyOk(api.talent("T" + round + i, "photographer"), gig);
+				tasks.add(() -> {
+					try {
+						shortlists.shortlist(poster.id(), application, false);
+						return true;
+					}
+					catch (RuntimeException e) {
+						return false;
+					}
+				});
+			}
+			Concurrently.runAll(tasks);
+			most = Math.max(most, jdbc.sql("SELECT count(*) FROM hiring.shortlist_entry WHERE gig_id = :g AND removed_at IS NULL").param("g", gig)
+					.query(Integer.class).single());
 		}
 
-		Concurrently.runAll(tasks);
-
-		assertThat(jdbc.sql("SELECT count(*) FROM hiring.shortlist_entry WHERE gig_id = :g AND removed_at IS NULL").param("g", gig)
-				.query(Integer.class).single()).as("shortlisted although the limit is 3").isGreaterThan(3);
+		assertThat(most).as("shortlisted although the limit is 3").isGreaterThan(3);
 	}
 
 }

@@ -19,7 +19,12 @@ public record ApplicantsResponse(List<Item> items, String nextCursor) {
 
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	public record Item(UUID id, UUID talentId, String note, Instant appliedAt, ApplicantProfile profile, boolean shortlisted,
-			boolean posterShares, boolean talentConsented) {
+			boolean posterShares, boolean talentConsented, Hire hire) {
+	}
+
+	/** The application's latest hire: confirm or decline it by {@code id} if the Talent started it and it is PENDING. */
+	@JsonInclude(JsonInclude.Include.NON_NULL)
+	public record Hire(UUID id, String status, String startedBy, Instant expiresAt) {
 	}
 
 	public static ApplicantsResponse of(ApplicantsPage page) {
@@ -28,7 +33,8 @@ public record ApplicantsResponse(List<Item> items, String nextCursor) {
 
 	private static Item item(Applicant a) {
 		return new Item(a.id(), a.talentId(), a.note(), a.appliedAt(), a.profile(), a.shortlisted(), a.posterShares(),
-				a.talentConsented());
+				a.talentConsented(),
+				a.hire() == null ? null : new Hire(a.hire().id(), a.hire().status(), a.hire().startedBy().name(), a.hire().expiresAt()));
 	}
 
 }
