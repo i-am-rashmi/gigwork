@@ -49,6 +49,8 @@ class GigsModuleTest {
 
 	@Autowired
 	GigService gigs;
+	@Autowired
+	GigLookup lookup;
 	@MockitoBean
 	ReferenceData reference;
 	@MockitoBean
@@ -76,6 +78,35 @@ class GigsModuleTest {
 
 		GigView cancelled = gigs.cancel(poster, published.id(), null);
 		assertThat(cancelled.status()).isEqualTo(GigStatus.CANCELLED);
+	}
+
+	@Test
+	void otherModulesCanLookGigsUpOneByOneOrInABatchInAnyStatus() {
+		UUID poster = UUID.randomUUID();
+		UUID category = UUID.randomUUID();
+		when(names.firstName(poster)).thenReturn(Optional.of("Asha"));
+		when(reference.category(category)).thenReturn(Optional.of(new CategoryInfo(category, "video-editor", "Video editor",
+				"REMOTE", false, true, 1, List.of())));
+		Instant start = Instant.now().plusSeconds(3 * 86_400);
+		GigDraft draft = new GigDraft(category, null, null, "Edit a wedding film", "Two hours of footage", start,
+				start.plusSeconds(3600), WorkMode.REMOTE, null, null, null, null, null, null);
+		UUID open = gigs.publish(poster, draft).id();
+		UUID cancelled = gigs.publish(poster, draft).id();
+		gigs.cancel(poster, cancelled, null);
+
+		GigSummary one = lookup.find(open).orElseThrow();
+		assertThat(one.posterId()).isEqualTo(poster);
+		assertThat(one.categoryId()).isEqualTo(category);
+		assertThat(one.categoryName()).isEqualTo("Video editor");
+		assertThat(one.status()).isEqualTo(GigState.OPEN);
+		assertThat(one.locationLabel()).isNull();
+
+		UUID unknown = UUID.randomUUID();
+		assertThat(lookup.find(unknown)).isEmpty();
+		var many = lookup.findAll(List.of(open, cancelled, unknown, open));
+		assertThat(many).containsOnlyKeys(open, cancelled);
+		assertThat(many.get(cancelled).status()).isEqualTo(GigState.CANCELLED);
+		assertThat(lookup.findAll(List.of())).isEmpty();
 	}
 
 }
