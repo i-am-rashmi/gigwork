@@ -20,6 +20,12 @@ public class IdentityTestConfig {
 		return new TestAccounts(jdbc, issuer, clock);
 	}
 
+	/** Counts SQL statements for the no-N+1 tests (see {@link SqlCounter}). */
+	@Bean
+	static org.springframework.beans.factory.config.BeanPostProcessor sqlCounter() {
+		return SqlCounter.wrapper();
+	}
+
 	@Bean
 	@Primary
 	MutableClock mutableClock() {

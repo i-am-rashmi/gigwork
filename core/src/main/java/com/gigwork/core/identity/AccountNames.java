@@ -1,5 +1,7 @@
 package com.gigwork.core.identity;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -11,5 +13,8 @@ public interface AccountNames {
 
 	/** The account's first name, or empty if the account has none or does not exist. */
 	Optional<String> firstName(UUID accountId);
+
+	/** First names of many accounts in one query; accounts with no first name or that do not exist are absent. */
+	Map<UUID, String> firstNames(Collection<UUID> accountIds);
 
 }

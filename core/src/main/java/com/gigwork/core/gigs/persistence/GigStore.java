@@ -188,6 +188,12 @@ public class GigStore {
 				.optional();
 	}
 
+	/** Many gigs by ID in one query; unknown IDs are absent. */
+	public List<StoredGig> findAll(java.util.Collection<UUID> ids) {
+		return jdbc.sql("SELECT " + COLUMNS + " FROM gigs.gig WHERE id = ANY(:ids)").param("ids", ids.toArray(UUID[]::new))
+				.query(GigStore::map).list();
+	}
+
 	/** The named parameters shared by the insert and the update (a HashMap: several values are null). */
 	private static Map<String, Object> values(GigFields f) {
 		Map<String, Object> v = new HashMap<>();

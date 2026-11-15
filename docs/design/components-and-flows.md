@@ -65,7 +65,7 @@ AI Drafting checks the daily limit, masks contact details, fetches the live cate
 
 ### 5. A Talent finds a gig and applies
 
-Discovery lists open gigs from Gigs. On apply, Platform checks the daily limit; Hiring checks with Gigs that the gig is still open, that the gig's category is on the Talent's profile, and that it isn't their own gig; a busy-date overlap only shows a warning. The database allows one application per Talent per gig. Posters get a periodic summary of new applications rather than one notification each.
+Discovery lists open gigs from Gigs. On apply, Hiring counts the Talent's submissions against the abuse limit (NFR-39) and checks with Gigs that the gig is still open, that the gig's category is on the Talent's profile, and that it isn't their own gig; a busy-date overlap only shows a warning. The database allows one application per Talent per gig. Posters get a periodic summary of new applications rather than one notification each.
 
 ### 6. A Poster shortlists; contacts are revealed with consent
 
