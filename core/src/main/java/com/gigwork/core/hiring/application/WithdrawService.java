@@ -15,6 +15,7 @@ import com.gigwork.core.hiring.domain.ApplicationNotFoundException;
 import com.gigwork.core.hiring.persistence.ApplicationStore;
 import com.gigwork.core.hiring.persistence.ApplicationStore.Owner;
 import com.gigwork.core.hiring.persistence.ApplicationStore.Withdrawn;
+import com.gigwork.core.hiring.persistence.ShortlistStore;
 
 /**
  * Withdrawing an application. One conditional UPDATE does the change (ACTIVE to WITHDRAWN, applicant only), in the
@@ -25,12 +26,14 @@ import com.gigwork.core.hiring.persistence.ApplicationStore.Withdrawn;
 public class WithdrawService {
 
 	private final ApplicationStore store;
+	private final ShortlistStore shortlists;
 	private final TransactionTemplate transaction;
 	private final ApplicationEventPublisher events;
 	private final Clock clock;
 
-	WithdrawService(ApplicationStore store, TransactionTemplate transaction, ApplicationEventPublisher events, Clock clock) {
+	WithdrawService(ApplicationStore store, ShortlistStore shortlists, TransactionTemplate transaction, ApplicationEventPublisher events, Clock clock) {
 		this.store = store;
+		this.shortlists = shortlists;
 		this.transaction = transaction;
 		this.events = events;
 		this.clock = clock;
@@ -44,8 +47,10 @@ public class WithdrawService {
 		Instant now = clock.instant();
 		Boolean done = transaction.execute(status -> {
 			Optional<Withdrawn> withdrawn = store.withdraw(applicationId, talentId, now);
-			withdrawn.ifPresent(w -> events.publishEvent(
-					new ApplicationWithdrawn(applicationId, w.gigId(), talentId, w.posterId(), now)));
+			withdrawn.ifPresent(w -> {
+				shortlists.endForWithdrawnApplication(applicationId, now); // access to contacts ends in the same transaction
+				events.publishEvent(new ApplicationWithdrawn(applicationId, w.gigId(), talentId, w.posterId(), now));
+			});
 			return withdrawn.isPresent();
 		});
 		if (!Boolean.TRUE.equals(done)) {

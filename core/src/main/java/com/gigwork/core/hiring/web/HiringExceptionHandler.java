@@ -9,6 +9,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import com.gigwork.core.hiring.domain.AlreadyAppliedException;
+import com.gigwork.core.hiring.domain.AlreadyShortlistedException;
+import com.gigwork.core.hiring.domain.ApplicationNotActiveException;
+import com.gigwork.core.hiring.domain.ContactMethodRequiredException;
+import com.gigwork.core.hiring.domain.GigNotOpenException;
+import com.gigwork.core.hiring.domain.NotShortlistedException;
+import com.gigwork.core.hiring.domain.ShortlistActionLimitException;
+import com.gigwork.core.hiring.domain.ShortlistFullException;
 import com.gigwork.core.hiring.domain.AlreadyWithdrawnException;
 import com.gigwork.core.hiring.domain.ApplicationNotFoundException;
 import com.gigwork.core.hiring.domain.ApplyLimitReachedException;
@@ -24,7 +31,7 @@ import com.gigwork.core.hiring.domain.ProfileNotActiveException;
  * state of the profile, the gig or the application is 409 (with a {@code code} clients can act on), the daily limit
  * is 429. The messages are for the user.
  */
-@RestControllerAdvice(assignableTypes = { ApplicationController.class, ApplicationListController.class })
+@RestControllerAdvice(assignableTypes = { ApplicationController.class, ApplicationListController.class, ShortlistController.class })
 class HiringExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(InvalidApplicationException.class)
@@ -73,6 +80,41 @@ class HiringExceptionHandler extends ResponseEntityExceptionHandler {
 		List<Period> periods = ex.periods().stream().map(p -> new Period(p.start(), p.end(), p.kind().name())).toList();
 		problem.setProperty("periods", periods);
 		return problem;
+	}
+
+	@ExceptionHandler(AlreadyShortlistedException.class)
+	ProblemDetail alreadyShortlisted(AlreadyShortlistedException ex) {
+		return problem(HttpStatus.CONFLICT, "Already shortlisted", ex.getMessage(), "ALREADY_SHORTLISTED");
+	}
+
+	@ExceptionHandler(NotShortlistedException.class)
+	ProblemDetail notShortlisted(NotShortlistedException ex) {
+		return problem(HttpStatus.CONFLICT, "Not shortlisted", ex.getMessage(), "NOT_SHORTLISTED");
+	}
+
+	@ExceptionHandler(ShortlistFullException.class)
+	ProblemDetail shortlistFull(ShortlistFullException ex) {
+		return problem(HttpStatus.CONFLICT, "Shortlist full", ex.getMessage(), "SHORTLIST_FULL");
+	}
+
+	@ExceptionHandler(ContactMethodRequiredException.class)
+	ProblemDetail contactMethodRequired(ContactMethodRequiredException ex) {
+		return problem(HttpStatus.CONFLICT, "Contact method required", ex.getMessage(), "CONTACT_METHOD_REQUIRED");
+	}
+
+	@ExceptionHandler(ApplicationNotActiveException.class)
+	ProblemDetail applicationNotActive(ApplicationNotActiveException ex) {
+		return problem(HttpStatus.CONFLICT, "Application withdrawn", ex.getMessage(), "APPLICATION_NOT_ACTIVE");
+	}
+
+	@ExceptionHandler(GigNotOpenException.class)
+	ProblemDetail gigNotOpenForShortlist(GigNotOpenException ex) {
+		return problem(HttpStatus.CONFLICT, "Gig not open", ex.getMessage(), "GIG_NOT_OPEN");
+	}
+
+	@ExceptionHandler(ShortlistActionLimitException.class)
+	ProblemDetail shortlistActionLimit(ShortlistActionLimitException ex) {
+		return problem(HttpStatus.TOO_MANY_REQUESTS, "Too many shortlist actions", ex.getMessage(), "SHORTLIST_ACTION_LIMIT");
 	}
 
 	@ExceptionHandler(ApplyLimitReachedException.class)

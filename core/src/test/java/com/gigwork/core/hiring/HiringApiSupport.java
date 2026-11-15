@@ -2,6 +2,7 @@ package com.gigwork.core.hiring;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
@@ -97,6 +98,34 @@ public final class HiringApiSupport {
 
 	public static UUID id(ResultActions result) throws Exception {
 		return UUID.fromString(JsonPath.read(result.andReturn().getResponse().getContentAsString(), "$.id"));
+	}
+
+	/** The account shares WhatsApp and call (its verified mobile number). */
+	public void sharesContact(TestAccount account) throws Exception {
+		contactMethods(account, "{\"whatsapp\":true,\"call\":true,\"email\":false}").andExpect(status().isOk());
+	}
+
+	public ResultActions contactMethods(TestAccount account, String body) throws Exception {
+		return mvc.perform(auth(put("/v1/me/contact-methods"), account).contentType(MediaType.APPLICATION_JSON).content(body));
+	}
+
+	public ResultActions shortlist(TestAccount poster, UUID applicationId, boolean shareMyContact) throws Exception {
+		return mvc.perform(auth(post("/v1/applications/" + applicationId + "/shortlist"), poster)
+				.contentType(MediaType.APPLICATION_JSON).content("{\"shareMyContact\":" + shareMyContact + "}"));
+	}
+
+	public ResultActions removeFromShortlist(TestAccount poster, UUID applicationId) throws Exception {
+		return mvc.perform(auth(post("/v1/applications/" + applicationId + "/shortlist/remove"), poster));
+	}
+
+	public ResultActions posterShare(TestAccount poster, UUID applicationId, boolean share) throws Exception {
+		return mvc.perform(auth(put("/v1/applications/" + applicationId + "/shortlist/poster-share"), poster)
+				.contentType(MediaType.APPLICATION_JSON).content("{\"share\":" + share + "}"));
+	}
+
+	public ResultActions consent(TestAccount talent, UUID applicationId, boolean consent) throws Exception {
+		return mvc.perform(auth(put("/v1/applications/" + applicationId + "/shortlist/consent"), talent)
+				.contentType(MediaType.APPLICATION_JSON).content("{\"consent\":" + consent + "}"));
 	}
 
 	private static MockHttpServletRequestBuilder auth(MockHttpServletRequestBuilder request, TestAccount account) {
