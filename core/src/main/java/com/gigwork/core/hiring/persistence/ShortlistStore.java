@@ -15,8 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Shortlist entries, the Poster's shortlist actions and the contact access log. Native SQL through JdbcClient
- * (ADR-0008): every change is one conditional statement. The two limits are invariants, so {@link #lockPoster} and
- * then {@link #lockGig} must be taken, in this order, in the same transaction before anything is counted.
+ * (ADR-0008): every change is one conditional statement. The two limits are invariants, so {@link #lockPoster} must
+ * be taken in the same transaction before anything is counted. A gig has one Poster, so the Poster's lock also
+ * serialises every shortlist change of a gig; if gigs ever get several Posters, add a gig lock and take the Poster
+ * lock first.
  */
 @Repository
 public class ShortlistStore {
@@ -53,16 +55,10 @@ public class ShortlistStore {
 		jdbc.sql("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))").param("key", key).query().singleRow();
 	}
 
-	/** Serialises all shortlist actions of one Poster (the 24-hour limit spans their gigs). Take it first. */
+	/** Serialises all shortlist actions of one Poster: the 24-hour limit spans their gigs, and so does the per-gig count. */
 	@Transactional(propagation = Propagation.MANDATORY)
 	public void lockPoster(UUID posterId) {
 		advisoryLock("shortlist_poster:" + posterId);
-	}
-
-	/** Serialises the shortlist changes of one gig (the limit of Talent shortlisted at once). Take it second. */
-	@Transactional(propagation = Propagation.MANDATORY)
-	public void lockGig(UUID gigId) {
-		advisoryLock("shortlist_gig:" + gigId);
 	}
 
 	@Transactional(propagation = Propagation.MANDATORY)

@@ -30,7 +30,7 @@ import com.gigwork.core.identity.ContactMethods;
  * Shortlisting applicants and the consent to share contact details (FR-25, FR-25a, FR-26, NFR-38).
  *
  * <p>What can be read is checked first, with no lock and no write. Each write is then one transaction under the
- * Poster's lock and the gig's lock (always in this order): the shortlist is one INSERT ... ON CONFLICT, then the
+ * Poster's lock (a gig has one Poster, so it also serialises the per-gig count): the shortlist is one INSERT ... ON CONFLICT, then the
  * limits are counted and the transaction is rolled back by an exception if one is exceeded, then the action is
  * logged. Removing never waits for or fails on the daily limit: it ends contact access, so it must always work; it
  * is logged and counts towards the limit of the next additions.
@@ -86,7 +86,7 @@ public class ShortlistService {
 		}
 		Instant now = clock.instant();
 		transaction.executeWithoutResult(status -> {
-			locks.lock(posterId, application.gigId());
+			locks.lock(posterId);
 			if (!store.shortlist(applicationId, posterId, shareMyContact, now)) {
 				throw store.find(applicationId).filter(ShortlistStore.Entry::isCurrent).isPresent()
 						? new AlreadyShortlistedException() : new ApplicationNotActiveException();
@@ -113,7 +113,7 @@ public class ShortlistService {
 		StoredApplication application = ownApplication(posterId, applicationId);
 		Instant now = clock.instant();
 		transaction.executeWithoutResult(status -> {
-			locks.lock(posterId, application.gigId());
+			locks.lock(posterId);
 			if (!store.remove(applicationId, posterId, now)) {
 				throw new NotShortlistedException();
 			}

@@ -16,9 +16,8 @@ class StoreShortlistLocks implements ShortlistLocks {
 	}
 
 	@Override
-	public void lock(UUID posterId, UUID gigId) {
+	public void lock(UUID posterId) {
 		store.lockPoster(posterId);
-		store.lockGig(gigId);
 	}
 
 }
