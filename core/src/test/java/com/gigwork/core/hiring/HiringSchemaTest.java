@@ -23,9 +23,13 @@ class HiringSchemaTest {
 
 	private final UUID talent = UUID.randomUUID();
 	private final UUID gig = UUID.randomUUID();
+	private final UUID poster = UUID.randomUUID();
 
 	@AfterEach
 	void cleanUp() {
+		jdbc.sql("DELETE FROM hiring.shortlist_action WHERE poster_id = :t").param("t", poster).update();
+		jdbc.sql("DELETE FROM hiring.shortlist_entry WHERE poster_id = :t").param("t", poster).update();
+		jdbc.sql("DELETE FROM hiring.contact_access_log WHERE viewer_id = :t").param("t", poster).update();
 		jdbc.sql("DELETE FROM hiring.application_submission WHERE talent_id = :t").param("t", talent).update();
 		jdbc.sql("DELETE FROM hiring.application WHERE talent_id = :t").param("t", talent).update();
 	}
@@ -97,6 +101,78 @@ class HiringSchemaTest {
 				.query(String.class).single()).contains("(talent_id, applied_at DESC, id DESC)");
 		assertThat(jdbc.sql("SELECT indexdef FROM pg_indexes WHERE schemaname = 'hiring' AND indexname = 'application_submission_talent_time'")
 				.query(String.class).single()).contains("(talent_id, submitted_at)");
+	}
+
+	// ---- shortlist and contact log -------------------------------------------------------------------------------------------
+
+	private UUID anApplication() {
+		UUID id = UUID.randomUUID();
+		application(id, UUID.randomUUID(), null, "ACTIVE", false);
+		return id;
+	}
+
+	private int entry(UUID applicationId, String shortlisted, String removed, String consented, String withdrawn) {
+		return jdbc.sql("""
+				INSERT INTO hiring.shortlist_entry (application_id, gig_id, poster_id, talent_id, shortlisted_at, removed_at,
+				    poster_shares, talent_consented_at, consent_withdrawn_at)
+				VALUES (:a, :g, :p, :t, CAST(:s AS timestamptz), CAST(:r AS timestamptz), true, CAST(:c AS timestamptz),
+				    CAST(:w AS timestamptz))""")
+				.param("a", applicationId).param("g", gig).param("p", poster).param("t", talent).param("s", shortlisted)
+				.param("r", removed).param("c", consented).param("w", withdrawn).update();
+	}
+
+	@Test
+	void aShortlistEntryBelongsToOneApplicationAndHasOneRowForEver() {
+		UUID application = anApplication();
+		assertThat(entry(application, "2030-01-01 10:00+00", null, null, null)).isEqualTo(1);
+		assertThatThrownBy(() -> entry(application, "2030-01-01 11:00+00", null, null, null))
+				.isInstanceOf(DataIntegrityViolationException.class);
+		assertThatThrownBy(() -> entry(UUID.randomUUID(), "2030-01-01 10:00+00", null, null, null))
+				.isInstanceOf(DataIntegrityViolationException.class); // no such application
+	}
+
+	@Test
+	void theTimesOfAShortlistEntryAreCoherent() {
+		// removal, consent before the Talent was shortlisted
+		assertThatThrownBy(() -> entry(anApplication(), "2030-01-01 10:00+00", "2030-01-01 09:00+00", null, null))
+				.isInstanceOf(DataIntegrityViolationException.class);
+		assertThatThrownBy(() -> entry(anApplication(), "2030-01-01 10:00+00", null, "2030-01-01 09:00+00", null))
+				.isInstanceOf(DataIntegrityViolationException.class);
+		// a withdrawal needs a consent, and cannot come before it
+		assertThatThrownBy(() -> entry(anApplication(), "2030-01-01 10:00+00", null, null, "2030-01-01 12:00+00"))
+				.isInstanceOf(DataIntegrityViolationException.class);
+		assertThatThrownBy(() -> entry(anApplication(), "2030-01-01 10:00+00", null, "2030-01-01 12:00+00", "2030-01-01 11:00+00"))
+				.isInstanceOf(DataIntegrityViolationException.class);
+		assertThat(entry(anApplication(), "2030-01-01 10:00+00", "2030-01-01 13:00+00", "2030-01-01 11:00+00", "2030-01-01 12:00+00"))
+				.isEqualTo(1);
+	}
+
+	@Test
+	void shortlistActionsAndContactViewsAreNeverUpdatedButCanBeDeleted() {
+		UUID application = anApplication();
+		jdbc.sql("INSERT INTO hiring.shortlist_action (id, poster_id, application_id, action, at) VALUES (gen_random_uuid(), :p, :a, 'SHORTLIST', now())")
+				.param("p", poster).param("a", application).update();
+		assertThatThrownBy(() -> jdbc.sql("INSERT INTO hiring.shortlist_action (id, poster_id, application_id, action, at) VALUES (gen_random_uuid(), :p, :a, 'HIRE', now())")
+				.param("p", poster).param("a", application).update()).isInstanceOf(DataIntegrityViolationException.class);
+		assertThatThrownBy(() -> jdbc.sql("UPDATE hiring.shortlist_action SET action = 'REMOVE' WHERE poster_id = :p").param("p", poster).update())
+				.isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("never updated");
+
+		jdbc.sql("INSERT INTO hiring.contact_access_log (id, viewer_id, viewed_id, gig_id, application_id, viewed_at) VALUES (gen_random_uuid(), :p, :t, :g, :a, now())")
+				.param("p", poster).param("t", talent).param("g", gig).param("a", application).update();
+		assertThatThrownBy(() -> jdbc.sql("UPDATE hiring.contact_access_log SET viewed_at = now() WHERE viewer_id = :p").param("p", poster).update())
+				.isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("never updated");
+		assertThat(jdbc.sql("DELETE FROM hiring.contact_access_log WHERE viewer_id = :p").param("p", poster).update()).isEqualTo(1);
+	}
+
+	@Test
+	void theShortlistQueriesAreServedByTheirIndexes() {
+		for (String name : new String[] { "shortlist_entry_gig_current", "shortlist_entry_talent_current", "shortlist_action_poster_time",
+				"contact_access_log_viewed_at" }) {
+			assertThat(jdbc.sql("SELECT count(*) FROM pg_indexes WHERE schemaname = 'hiring' AND indexname = :n").param("n", name)
+					.query(Integer.class).single()).as(name).isEqualTo(1);
+		}
+		assertThat(jdbc.sql("SELECT indexdef FROM pg_indexes WHERE indexname = 'shortlist_entry_gig_current'").query(String.class).single())
+				.contains("removed_at IS NULL");
 	}
 
 }

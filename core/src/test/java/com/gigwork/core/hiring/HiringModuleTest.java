@@ -32,6 +32,8 @@ import com.gigwork.core.hiring.application.ApplyService;
 import com.gigwork.core.hiring.application.WithdrawService;
 import com.gigwork.core.hiring.domain.AlreadyAppliedException;
 import com.gigwork.core.hiring.domain.ProfileNotActiveException;
+import com.gigwork.core.identity.AccountNames;
+import com.gigwork.core.identity.ContactMethods;
 import com.gigwork.core.profile.TalentEligibility;
 import com.gigwork.core.profile.TalentProfiles;
 
@@ -65,6 +67,10 @@ class HiringModuleTest {
 	TalentProfiles profiles;
 	@MockitoBean
 	Availability availability;
+	@MockitoBean
+	AccountNames names;
+	@MockitoBean
+	ContactMethods contactMethods;
 
 	@Test
 	void aTalentAppliesWithdrawsAndSeesTheApplicationUsingOnlyTheModulesOwnBeansAndStubbedNeighbours() {

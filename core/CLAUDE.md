@@ -46,6 +46,7 @@ The base package holds only the module's public API. Result records that never l
 - **No network calls (HTTP, SMS, email, Kafka) inside a database transaction.**
 - Invariants belong in the database where possible (ADR-0002): unique constraints, partial unique indexes, the exclusion constraint for overlapping bookings, conditional updates such as `UPDATE ... WHERE status = 'OPEN'`. Don't replace these with check-then-act code.
 - Code that may be refused by a database constraint, as an expected answer (a booking that overlaps), must not ruin the caller's transaction: PostgreSQL aborts a transaction after a failed statement. Spring's JPA transaction manager cannot do `PROPAGATION_NESTED` with Hibernate, so take a JDBC savepoint on the transaction's connection (`DataSourceUtils.getConnection`), as `BookingService` does, and throw only after the transaction block ends. Simultaneous inserts into an exclusion constraint can deadlock; serialise them per owner with `pg_advisory_xact_lock` (the constraint still decides).
+- Shortlist limits are protected by the per-Poster lock alone; a gig has one Poster, so it also covers the per-gig count. If gigs ever get several Posters, add a gig lock and always take the Poster lock first.
 - IDs are random UUIDs, never sequences (NFR-33). City-local rows carry `city_id`.
 
 ## Scheduled jobs (ADR-0010)
