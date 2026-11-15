@@ -24,7 +24,7 @@ import com.gigwork.core.hiring.domain.ProfileNotActiveException;
  * state of the profile, the gig or the application is 409 (with a {@code code} clients can act on), the daily limit
  * is 429. The messages are for the user.
  */
-@RestControllerAdvice(assignableTypes = { ApplicationController.class })
+@RestControllerAdvice(assignableTypes = { ApplicationController.class, ApplicationListController.class })
 class HiringExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(InvalidApplicationException.class)
