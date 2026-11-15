@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.gigwork.core.hiring.application.ApplicationQueries;
 import com.gigwork.core.hiring.web.dto.ApplicantsResponse;
 import com.gigwork.core.hiring.web.dto.MyApplicationResponse;
+import com.gigwork.core.hiring.web.dto.ShortlistedResponse;
 import com.gigwork.core.platform.CurrentAccount;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,6 +49,16 @@ class ApplicationListController {
 	ApplicantsResponse applicants(@PathVariable UUID gigId, @RequestParam(required = false) String cursor,
 			@RequestParam(required = false) Integer size) {
 		return ApplicantsResponse.of(queries.applicants(CurrentAccount.required(), gigId, cursor, size));
+	}
+
+	@Operation(summary = "List the gigs you are shortlisted for, newest first",
+			description = "Your Shortlisted tab: each gig as it is now (closed gigs stay, with their status), the Poster's "
+					+ "first name, whether the Poster shares their contact and whether you have consented. Never contact "
+					+ "details: those are only returned by the contact view.")
+	@ApiResponse(responseCode = "400", description = "A bad cursor or page size")
+	@GetMapping("/me/shortlists")
+	ShortlistedResponse shortlisted(@RequestParam(required = false) String cursor, @RequestParam(required = false) Integer size) {
+		return ShortlistedResponse.of(queries.shortlisted(CurrentAccount.required(), cursor, size));
 	}
 
 }

@@ -82,6 +82,10 @@ public final class HiringApiSupport {
 		return mvc.perform(auth(get("/v1/me/applications" + query), account));
 	}
 
+	public ResultActions shortlists(TestAccount account, String query) throws Exception {
+		return mvc.perform(auth(get("/v1/me/shortlists" + query), account));
+	}
+
 	public ResultActions applicants(TestAccount account, UUID gigId, String query) throws Exception {
 		return mvc.perform(auth(get("/v1/gigs/" + gigId + "/applications" + query), account));
 	}

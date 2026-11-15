@@ -3,6 +3,8 @@ package com.gigwork.core.hiring.persistence;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -157,6 +159,30 @@ public class ShortlistStore {
 				VALUES (:id, :viewer, :viewed, :gig, :application, :now)""")
 				.param("id", UUID.randomUUID()).param("viewer", viewerId).param("viewed", viewedId).param("gig", gigId)
 				.param("application", applicationId).param("now", ts(now)).update();
+	}
+
+	/** The last entry of a page of the Shortlisted tab, to continue after it. */
+	public record Keyset(Instant at, UUID id) {
+	}
+
+	/** Entries of many applications in one query (current or removed); applications never shortlisted are absent. */
+	public List<Entry> findAll(Collection<UUID> applicationIds) {
+		if (applicationIds.isEmpty()) {
+			return List.of();
+		}
+		return jdbc.sql("SELECT " + COLUMNS + " FROM hiring.shortlist_entry WHERE application_id = ANY(:ids)")
+				.param("ids", applicationIds.toArray(UUID[]::new)).query(ShortlistStore::map).list();
+	}
+
+	/** The Talent's current entries, newest shortlisted first, after {@code after} when given. */
+	public List<Entry> listCurrentByTalent(UUID talentId, Keyset after, int limit) {
+		var sql = jdbc.sql("SELECT " + COLUMNS + " FROM hiring.shortlist_entry WHERE talent_id = :t AND removed_at IS NULL"
+				+ (after == null ? "" : " AND (shortlisted_at, application_id) < (:atAt, :atId)")
+				+ " ORDER BY shortlisted_at DESC, application_id DESC LIMIT :limit").param("t", talentId).param("limit", limit);
+		if (after != null) {
+			sql = sql.param("atAt", ts(after.at())).param("atId", after.id());
+		}
+		return sql.query(ShortlistStore::map).list();
 	}
 
 	public Optional<Entry> find(UUID applicationId) {
