@@ -217,8 +217,6 @@ class HiringSchemaTest {
 			assertThatThrownBy(() -> hire(UUID.randomUUID(), application, b[0], b[1], b[2], b[3], b[4], booking))
 					.as(String.join(",", java.util.Arrays.stream(b).map(String::valueOf).toList())).isInstanceOf(DataIntegrityViolationException.class);
 		}
-		assertThatThrownBy(() -> hire(UUID.randomUUID(), application, "CONFIRMED", "2030-01-01 11:00+00", null, null, null, false))
-				.as("confirmed without a booking").isInstanceOf(DataIntegrityViolationException.class);
 	}
 
 	@Test

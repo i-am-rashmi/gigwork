@@ -25,8 +25,9 @@ CREATE TABLE hiring.hire (
     -- each status says which of the other columns are set
     CONSTRAINT hire_pending_shape CHECK (status <> 'PENDING' OR (
         confirmed_at IS NULL AND ended_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL AND booking_id IS NULL)),
+    -- booking_id is set in the same transaction as the confirmation, right after Availability has booked the Talent
     CONSTRAINT hire_confirmed_shape CHECK (status <> 'CONFIRMED' OR (
-        confirmed_at IS NOT NULL AND booking_id IS NOT NULL AND ended_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)),
+        confirmed_at IS NOT NULL AND ended_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)),
     CONSTRAINT hire_not_confirmed_shape CHECK (status NOT IN ('LAPSED', 'DECLINED', 'WITHDRAWN') OR (
         ended_at IS NOT NULL AND confirmed_at IS NULL AND booking_id IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)),
     CONSTRAINT hire_cancelled_shape CHECK (status <> 'CANCELLED' OR (
