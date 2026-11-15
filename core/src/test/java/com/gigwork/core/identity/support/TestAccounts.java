@@ -61,4 +61,10 @@ public class TestAccounts {
 		jdbc.sql("UPDATE identity.account SET first_name = :n WHERE id = :id").param("n", firstName).param("id", accountId).update();
 	}
 
+	/** The verified mobile number the test account was created with. */
+	public String mobileOf(UUID accountId) {
+		return jdbc.sql("SELECT mobile FROM identity.mobile_identity WHERE account_id = :id").param("id", accountId)
+				.query(String.class).single();
+	}
+
 }
