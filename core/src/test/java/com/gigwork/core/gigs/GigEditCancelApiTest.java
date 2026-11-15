@@ -291,7 +291,7 @@ class GigEditCancelApiTest {
 	}
 
 	@Test
-	void aGigCannotBeCancelledTwiceOrAfterItClosedAnotherWay() throws Exception {
+	void aGigCannotBeCancelledTwiceOrAfterItExpired() throws Exception {
 		UUID id = published(api.onSite());
 		UUID expired = published(api.onSite());
 		jdbc.sql("UPDATE gigs.gig SET status = 'EXPIRED', closed_at = now() WHERE id = :id").param("id", expired).update();
@@ -303,9 +303,8 @@ class GigEditCancelApiTest {
 
 		api.cancel(poster, id, "{}").andExpect(status().isConflict());
 		api.cancel(poster, expired, "{}").andExpect(status().isConflict());
-		api.cancel(poster, filled, "{}").andExpect(status().isConflict()); // cancelling a filled gig comes with hiring
 		assertThat(statusOf(expired)).isEqualTo("EXPIRED");
-		assertThat(statusOf(filled)).isEqualTo("FILLED");
+		assertThat(statusOf(filled)).isEqualTo("FILLED"); // a filled gig can be cancelled (FR-19), see GigHiringTest
 		assertThat(events.stream(GigCancelled.class).count()).isZero();
 	}
 

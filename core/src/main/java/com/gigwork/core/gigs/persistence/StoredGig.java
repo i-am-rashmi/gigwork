@@ -13,5 +13,5 @@ import com.gigwork.core.gigs.domain.WorkMode;
 public record StoredGig(UUID id, UUID posterId, UUID categoryId, UUID specialisationId, String languageCode,
 		String title, String description, Instant startAt, Instant endAt, WorkMode workMode, UUID cityId, UUID zoneId,
 		String locationLabel, UUID localityId, Boolean taOffered, Long budgetMin, Long budgetMax, GigStatus status,
-		Instant publishedAt, Instant updatedAt, Instant closedAt, String closeReason) {
+		Instant publishedAt, Instant updatedAt, Instant closedAt, String closeReason, boolean hirePending) {
 }

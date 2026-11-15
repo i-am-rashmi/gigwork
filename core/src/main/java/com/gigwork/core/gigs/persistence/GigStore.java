@@ -30,7 +30,7 @@ public class GigStore {
 	static final String COLUMNS = """
 			id, poster_id, category_id, specialisation_id, language_code, title, description, start_at, end_at,
 			work_mode, city_id, zone_id, location_label, locality_id, ta_offered, budget_min, budget_max, status,
-			published_at, updated_at, closed_at, close_reason""";
+			published_at, updated_at, closed_at, close_reason, hire_pending""";
 
 	private final JdbcClient jdbc;
 
@@ -73,7 +73,7 @@ public class GigStore {
 				WITH old AS (
 				    SELECT id, start_at, end_at, lat, lng, city_id, zone_id, location_label, specialisation_id, language_code
 				    FROM gigs.gig
-				    WHERE id = :id AND poster_id = :poster AND status = 'OPEN' AND start_at > :now
+				    WHERE id = :id AND poster_id = :poster AND status = 'OPEN' AND start_at > :now AND NOT hire_pending
 				    FOR UPDATE)
 				UPDATE gigs.gig g SET specialisation_id = :specialisation, language_code = :language, title = :title,
 				    description = :description, start_at = :start, end_at = :end, lat = :lat, lng = :lng, city_id = :city,
@@ -104,7 +104,7 @@ public class GigStore {
 	@Transactional(propagation = Propagation.MANDATORY)
 	public List<Expired> expireDue(Instant now, int limit) {
 		return jdbc.sql("""
-				UPDATE gigs.gig SET status = 'EXPIRED', closed_at = :now, updated_at = :now
+				UPDATE gigs.gig SET status = 'EXPIRED', closed_at = :now, updated_at = :now, hire_pending = false
 				WHERE id IN (SELECT id FROM gigs.gig WHERE status = 'OPEN' AND start_at <= :now
 				             ORDER BY start_at, id LIMIT :limit FOR UPDATE SKIP LOCKED)
 				  AND status = 'OPEN'
@@ -113,13 +113,63 @@ public class GigStore {
 				.query((rs, row) -> new Expired(rs.getObject("id", UUID.class), rs.getObject("poster_id", UUID.class))).list();
 	}
 
-	/** OPEN to CANCELLED for the Poster's own gig; false when no row matched (see {@link #update}). */
+	/**
+	 * OPEN or FILLED to CANCELLED for the Poster's own gig (FR-19), clearing any hire hold. The row is locked by the
+	 * statement, so a confirmation at the same moment either filled the gig first (and this cancels the filled gig) or
+	 * finds it cancelled.
+	 *
+	 * @return whether the gig had been filled, or empty when no row matched (see {@link #update})
+	 */
 	@Transactional(propagation = Propagation.MANDATORY)
-	public boolean cancel(UUID id, UUID posterId, String reason, Instant now) {
+	public Optional<Boolean> cancel(UUID id, UUID posterId, String reason, Instant now) {
 		return jdbc.sql("""
-				UPDATE gigs.gig SET status = 'CANCELLED', closed_at = :now, updated_at = :now, close_reason = :reason
-				WHERE id = :id AND poster_id = :poster AND status = 'OPEN'""")
-				.param("id", id).param("poster", posterId).param("reason", reason).param("now", ts(now)).update() == 1;
+				WITH old AS (SELECT id, status FROM gigs.gig
+				             WHERE id = :id AND poster_id = :poster AND status IN ('OPEN', 'FILLED') FOR UPDATE)
+				UPDATE gigs.gig g SET status = 'CANCELLED', closed_at = :now, updated_at = :now, close_reason = :reason,
+				    hire_pending = false
+				FROM old WHERE g.id = old.id
+				RETURNING old.status = 'FILLED' AS was_filled""")
+				.param("id", id).param("poster", posterId).param("reason", reason).param("now", ts(now))
+				.query((rs, row) -> rs.getBoolean("was_filled")).optional();
+	}
+
+	// ---- what Hiring asks for (GigHiring): each one conditional statement -------------------------------------------
+
+	/** A hire is waiting for confirmation: only an open gig that has not started can be held. */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public boolean holdForHire(UUID id, Instant now) {
+		return jdbc.sql("UPDATE gigs.gig SET hire_pending = true WHERE id = :id AND status = 'OPEN' AND start_at > :now")
+				.param("id", id).param("now", ts(now)).update() == 1;
+	}
+
+	@Transactional(propagation = Propagation.MANDATORY)
+	public boolean releaseHold(UUID id) {
+		return jdbc.sql("UPDATE gigs.gig SET hire_pending = false WHERE id = :id AND status = 'OPEN'").param("id", id).update() == 1;
+	}
+
+	/** OPEN to FILLED, only before the start; also ends the hold. */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public boolean fill(UUID id, Instant now) {
+		return jdbc.sql("""
+				UPDATE gigs.gig SET status = 'FILLED', hire_pending = false, updated_at = :now
+				WHERE id = :id AND status = 'OPEN' AND start_at > :now""").param("id", id).param("now", ts(now)).update() == 1;
+	}
+
+	/** What became of a filled gig whose hire was cancelled. */
+	public record Reopened(UUID posterId, boolean expired) {
+	}
+
+	/** FILLED to OPEN while the gig has not started, otherwise to EXPIRED; empty if the gig was not filled. */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public Optional<Reopened> reopenOrExpire(UUID id, Instant now) {
+		return jdbc.sql("""
+				UPDATE gigs.gig SET
+				    status = CASE WHEN start_at > :now THEN 'OPEN' ELSE 'EXPIRED' END,
+				    closed_at = CASE WHEN start_at > :now THEN NULL ELSE CAST(:now AS timestamptz) END,
+				    updated_at = :now
+				WHERE id = :id AND status = 'FILLED'
+				RETURNING poster_id, status = 'EXPIRED' AS expired""").param("id", id).param("now", ts(now))
+				.query((rs, row) -> new Reopened(rs.getObject("poster_id", UUID.class), rs.getBoolean("expired"))).optional();
 	}
 
 	/**
@@ -226,7 +276,7 @@ public class GigStore {
 				rs.getObject("locality_id", UUID.class), (Boolean) rs.getObject("ta_offered"),
 				(Long) rs.getObject("budget_min"), (Long) rs.getObject("budget_max"),
 				GigStatus.valueOf(rs.getString("status")), instant(rs, "published_at"), instant(rs, "updated_at"),
-				instant(rs, "closed_at"), rs.getString("close_reason"));
+				instant(rs, "closed_at"), rs.getString("close_reason"), rs.getBoolean("hire_pending"));
 	}
 
 	private static Instant instant(ResultSet rs, String column) throws SQLException {

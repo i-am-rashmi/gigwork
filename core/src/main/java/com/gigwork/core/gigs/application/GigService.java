@@ -16,6 +16,7 @@ import com.gigwork.core.gigs.GigCancelled;
 import com.gigwork.core.gigs.GigChanged;
 import com.gigwork.core.gigs.GigPublished;
 import com.gigwork.core.gigs.config.GigProperties;
+import com.gigwork.core.gigs.domain.GigHirePendingException;
 import com.gigwork.core.gigs.domain.GigNotFoundException;
 import com.gigwork.core.gigs.domain.GigNotOpenException;
 import com.gigwork.core.gigs.domain.GigRules;
@@ -115,7 +116,7 @@ public class GigService {
 		return views.of(store.find(gigId).orElseThrow(), Optional.of(posterId));
 	}
 
-	/** Cancels the Poster's open gig (FR-19). Cancelling a filled gig comes with hiring. */
+	/** Cancels the Poster's open or filled gig (FR-19). Cancelling a filled gig also ends its hire (Hiring listens). */
 	public GigView cancel(UUID posterId, UUID gigId, String reason) {
 		Instant now = clock.instant();
 		String trimmed = reason == null || reason.isBlank() ? null : reason.strip();
@@ -123,11 +124,9 @@ public class GigService {
 			throw new InvalidGigException("The reason can be at most 500 characters.");
 		}
 		boolean cancelled = Boolean.TRUE.equals(transaction.execute(status -> {
-			boolean done = store.cancel(gigId, posterId, trimmed, now);
-			if (done) {
-				events.publishEvent(new GigCancelled(gigId, posterId, now));
-			}
-			return done;
+			Optional<Boolean> wasFilled = store.cancel(gigId, posterId, trimmed, now);
+			wasFilled.ifPresent(filled -> events.publishEvent(new GigCancelled(gigId, posterId, now, filled, trimmed)));
+			return wasFilled.isPresent();
 		}));
 		if (!cancelled) {
 			throw refusal(posterId, gigId);
@@ -141,7 +140,10 @@ public class GigService {
 	 */
 	private RuntimeException refusal(UUID posterId, UUID gigId) {
 		Optional<StoredGig> gig = store.find(gigId).filter(g -> g.posterId().equals(posterId));
-		return gig.isEmpty() ? new GigNotFoundException() : new GigNotOpenException();
+		if (gig.isEmpty()) {
+			return new GigNotFoundException();
+		}
+		return gig.get().hirePending() ? new GigHirePendingException() : new GigNotOpenException();
 	}
 
 	// ---- reading ----------------------------------------------------------------------------------------------
