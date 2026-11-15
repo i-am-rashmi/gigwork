@@ -12,9 +12,10 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param maxPageSize most applications per page
  * @param shortlistPerGig NFR-38: Talent shortlisted at the same time for one gig
  * @param shortlistActionsPerDay NFR-38: a Poster's shortlist actions (adding and removing) in any rolling 24 hours
+ * @param lapseBatchSize ADR-0010: pending hires lapsed per transaction by the lapse job
  */
 @ConfigurationProperties("gigwork.hiring")
 public record HiringProperties(@DefaultValue("30") int applySubmissionsPerDay, @DefaultValue("500") int noteMaxLength,
 		@DefaultValue("20") int defaultPageSize, @DefaultValue("50") int maxPageSize, @DefaultValue("10") int shortlistPerGig,
-		@DefaultValue("20") int shortlistActionsPerDay) {
+		@DefaultValue("20") int shortlistActionsPerDay, @DefaultValue("200") int lapseBatchSize) {
 }
