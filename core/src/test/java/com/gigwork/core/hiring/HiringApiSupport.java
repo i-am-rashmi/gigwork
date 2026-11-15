@@ -128,6 +128,14 @@ public final class HiringApiSupport {
 				.contentType(MediaType.APPLICATION_JSON).content("{\"consent\":" + consent + "}"));
 	}
 
+	public ResultActions talentContact(TestAccount poster, UUID applicationId) throws Exception {
+		return mvc.perform(auth(get("/v1/applications/" + applicationId + "/talent-contact"), poster));
+	}
+
+	public ResultActions posterContact(TestAccount talent, UUID applicationId) throws Exception {
+		return mvc.perform(auth(get("/v1/applications/" + applicationId + "/poster-contact"), talent));
+	}
+
 	private static MockHttpServletRequestBuilder auth(MockHttpServletRequestBuilder request, TestAccount account) {
 		return account == null ? request : request.header("Authorization", account.header());
 	}

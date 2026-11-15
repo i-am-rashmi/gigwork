@@ -12,6 +12,7 @@ import com.gigwork.core.hiring.domain.AlreadyAppliedException;
 import com.gigwork.core.hiring.domain.AlreadyShortlistedException;
 import com.gigwork.core.hiring.domain.ApplicationNotActiveException;
 import com.gigwork.core.hiring.domain.ContactMethodRequiredException;
+import com.gigwork.core.hiring.domain.ContactNotAvailableException;
 import com.gigwork.core.hiring.domain.GigNotOpenException;
 import com.gigwork.core.hiring.domain.NotShortlistedException;
 import com.gigwork.core.hiring.domain.ShortlistActionLimitException;
@@ -31,7 +32,8 @@ import com.gigwork.core.hiring.domain.ProfileNotActiveException;
  * state of the profile, the gig or the application is 409 (with a {@code code} clients can act on), the daily limit
  * is 429. The messages are for the user.
  */
-@RestControllerAdvice(assignableTypes = { ApplicationController.class, ApplicationListController.class, ShortlistController.class })
+@RestControllerAdvice(assignableTypes = { ApplicationController.class, ApplicationListController.class, ShortlistController.class,
+		ContactController.class })
 class HiringExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(InvalidApplicationException.class)
@@ -115,6 +117,11 @@ class HiringExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(ShortlistActionLimitException.class)
 	ProblemDetail shortlistActionLimit(ShortlistActionLimitException ex) {
 		return problem(HttpStatus.TOO_MANY_REQUESTS, "Too many shortlist actions", ex.getMessage(), "SHORTLIST_ACTION_LIMIT");
+	}
+
+	@ExceptionHandler(ContactNotAvailableException.class)
+	ProblemDetail contactNotAvailable(ContactNotAvailableException ex) {
+		return problem(HttpStatus.CONFLICT, "Contact not available", ex.getMessage(), "CONTACT_NOT_AVAILABLE");
 	}
 
 	@ExceptionHandler(ApplyLimitReachedException.class)
