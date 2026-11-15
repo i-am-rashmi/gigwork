@@ -32,7 +32,7 @@ The base package holds only the module's public API. Result records that never l
 - Refer to another module's data **by ID only**. No JPA relationships (`@ManyToOne` etc.) across modules.
 - Module APIs take and return their own **records/DTOs**, never internal entities.
 - Need an answer now (or same transaction) → call the other module's public service.
-- Can happen a moment later → publish an event with `ApplicationEventPublisher`; listen with `@ApplicationModuleListener`. Listeners must be idempotent.
+- Can happen a moment later → publish an event with `ApplicationEventPublisher`; listen with `@ApplicationModuleListener`. **Listeners must be idempotent, because events can be delivered again**: the registry redelivers an event when the app restarted before its listener completed (`republish-outstanding-events-on-restart`), and a Platform job (`EventResubmission`, every 5 minutes, ShedLock) resubmits events whose listener failed and stayed incomplete for 2 minutes, so a failed listener is retried until it works. Make each handler a conditional update that finds nothing to do the second time, and publish its own events only from the branch that changed a row. Test it by delivering the same event twice, and by making the listener fail once and running the resubmission.
 - Events that leave the core (to Kafka) go **only** through the platform module's outbox, never straight to Kafka.
 - Never query another module's tables, including in native SQL.
 
