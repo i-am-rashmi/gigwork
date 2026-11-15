@@ -138,6 +138,16 @@ public class HireStore {
 				.query(HireStore::map).optional();
 	}
 
+	/**
+	 * The application's CONFIRMED hire, locked FOR SHARE: a contact view reads it inside its own transaction, so a
+	 * cancellation at the same moment waits until the view has been logged.
+	 */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public Optional<StoredHire> lockConfirmedOfApplication(UUID applicationId) {
+		return jdbc.sql("SELECT " + COLUMNS + " FROM hiring.hire WHERE application_id = :a AND status = 'CONFIRMED' FOR SHARE")
+				.param("a", applicationId).query(HireStore::map).optional();
+	}
+
 	/** The application's CONFIRMED hire, if it has one. */
 	public Optional<StoredHire> findConfirmedOfApplication(UUID applicationId) {
 		return jdbc.sql("SELECT " + COLUMNS + " FROM hiring.hire WHERE application_id = :a AND status = 'CONFIRMED'")
