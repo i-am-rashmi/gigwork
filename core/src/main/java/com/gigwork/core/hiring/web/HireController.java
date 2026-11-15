@@ -6,11 +6,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.gigwork.core.hiring.application.HireService;
+import com.gigwork.core.hiring.web.dto.CancelHireRequest;
 import com.gigwork.core.hiring.web.dto.HireResponse;
 import com.gigwork.core.platform.CurrentAccount;
 
@@ -68,6 +70,17 @@ class HireController {
 	@PostMapping("/hires/{id}/withdraw")
 	HireResponse withdraw(@PathVariable UUID id) {
 		return HireResponse.of(hires.withdraw(CurrentAccount.required(), id));
+	}
+
+	@Operation(summary = "Cancel a confirmed hire",
+			description = "Either side, with a reason. The Talent's booking is released at once; if the gig has not started "
+					+ "it reopens so the Poster can hire someone else, otherwise it expires. The other side is notified.")
+	@ApiResponse(responseCode = "400", description = "The reason is missing or too long")
+	@ApiResponse(responseCode = "404", description = "Not a hire of yours")
+	@ApiResponse(responseCode = "409", description = "The hire is not confirmed")
+	@PostMapping("/hires/{id}/cancel")
+	HireResponse cancel(@PathVariable UUID id, @RequestBody(required = false) CancelHireRequest request) {
+		return HireResponse.of(hires.cancel(CurrentAccount.required(), id, request == null ? null : request.reason()));
 	}
 
 	@Operation(summary = "A hire", description = "Either side of the hire.")

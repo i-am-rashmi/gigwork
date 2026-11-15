@@ -16,6 +16,7 @@ import com.gigwork.core.gigs.GigLookup;
 import com.gigwork.core.gigs.GigState;
 import com.gigwork.core.gigs.GigSummary;
 import com.gigwork.core.hiring.HireConfirmed;
+import com.gigwork.core.hiring.HireCancelled;
 import com.gigwork.core.hiring.HireDeclined;
 import com.gigwork.core.hiring.HireSide;
 import com.gigwork.core.hiring.HireStarted;
@@ -26,7 +27,9 @@ import com.gigwork.core.hiring.domain.ApplicationNotFoundException;
 import com.gigwork.core.hiring.domain.GigNotOpenException;
 import com.gigwork.core.hiring.domain.HireAlreadyPendingException;
 import com.gigwork.core.hiring.domain.HireBookingConflictException;
+import com.gigwork.core.hiring.domain.HireNotConfirmedException;
 import com.gigwork.core.hiring.domain.HireNotPendingException;
+import com.gigwork.core.hiring.domain.InvalidApplicationException;
 import com.gigwork.core.hiring.domain.HireWrongSideException;
 import com.gigwork.core.hiring.domain.NotShortlistedException;
 import com.gigwork.core.hiring.persistence.ApplicationStore;
@@ -163,6 +166,33 @@ public class HireService {
 			throw new HireWrongSideException("The other side started this hire. You can decline it instead.");
 		}
 		return endPending(hire, "WITHDRAWN");
+	}
+
+	/**
+	 * Either side cancels a confirmed hire, giving a reason (FR-27a). In one transaction: the hire is cancelled, the gig
+	 * reopens if it has not started (otherwise it expires) and the Talent's booking is released, so the Poster can hire
+	 * someone else straight away.
+	 *
+	 * @throws InvalidApplicationException the reason is missing or longer than 500 characters
+	 * @throws ApplicationNotFoundException unknown hire, or the caller is neither side
+	 * @throws HireNotConfirmedException the hire is not confirmed
+	 */
+	public StoredHire cancel(UUID callerId, UUID hireId, String rawReason) {
+		StoredHire hire = visible(callerId, hireId);
+		String reason = rawReason == null ? "" : rawReason.strip();
+		if (reason.isEmpty() || reason.codePointCount(0, reason.length()) > 500) {
+			throw new InvalidApplicationException("Give a reason of 1 to 500 characters for cancelling the hire.");
+		}
+		HireSide side = side(hire, callerId);
+		Instant now = clock.instant();
+		return transaction.execute(status -> {
+			StoredHire cancelled = hires.cancel(hireId, side, reason, now).orElseThrow(HireNotConfirmedException::new);
+			gigHiring.reopenOrExpire(cancelled.gigId(), now);
+			availability.release(cancelled.gigId());
+			events.publishEvent(new HireCancelled(cancelled.id(), cancelled.applicationId(), cancelled.gigId(),
+					cancelled.talentId(), cancelled.posterId(), side, reason, now));
+			return cancelled;
+		});
 	}
 
 	/** One hire, for either of its two sides; anyone else gets a 404. */
