@@ -66,6 +66,9 @@ class HireLapseTest {
 	@BeforeEach
 	void setUp() {
 		clock.reset();
+		// the database is shared with other test classes: their pending hires would be swept up by this class's runs
+		jdbc.sql("UPDATE hiring.hire SET status = 'WITHDRAWN', ended_at = GREATEST(now(), started_at) WHERE status = 'PENDING'").update();
+		jdbc.sql("UPDATE gigs.gig SET hire_pending = false WHERE hire_pending").update();
 		collected.clear();
 		api = new HiringApiSupport(mvc, reference, accounts, clock);
 		poster = accounts.create();
@@ -134,8 +137,10 @@ class HireLapseTest {
 		List<Callable<Long>> tasks = List.of(lapse::run, lapse::run, lapse::run);
 
 		List<Long> rows = Concurrently.runAll(tasks);
+		// a hire another run had locked is skipped and left to that run or to the next tick (SKIP LOCKED): one more run
+		long rest = lapse.run();
 
-		assertThat(rows.stream().mapToLong(Long::longValue).sum()).isEqualTo(12);
+		assertThat(rows.stream().mapToLong(Long::longValue).sum() + rest).isEqualTo(12);
 		for (UUID hire : hires) {
 			assertThat(statusOf(hire)).isEqualTo("LAPSED");
 		}

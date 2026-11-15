@@ -156,10 +156,11 @@ class HireConcurrencyTest {
 		int hired = 0;
 		int withdrawn = 0;
 		for (int round = 0; round < 12; round++) {
-			UUID gig = api.openGig(poster);
-			Shortlisted s = api.shortlisted(poster, gig, "W" + round);
+			TestAccount roundPoster = accounts.create(); // a Poster may make only 20 shortlist actions a day
+			UUID gig = api.openGig(roundPoster);
+			Shortlisted s = api.shortlisted(roundPoster, gig, "W" + round);
 
-			List<Callable<String>> tasks = List.of(() -> run(() -> hires.start(poster.id(), s.application())),
+			List<Callable<String>> tasks = List.of(() -> run(() -> hires.start(roundPoster.id(), s.application())),
 					() -> run(() -> withdrawing.withdraw(s.talent().id(), s.application())));
 			List<String> results = Concurrently.runAll(tasks);
 
@@ -182,11 +183,12 @@ class HireConcurrencyTest {
 	@Test
 	void startingAHireAndRemovingTheTalentFromTheShortlistAtOnceNeverLeavesAHireOnAnUnshortlistedTalent() throws Exception {
 		for (int round = 0; round < 12; round++) {
-			UUID gig = api.openGig(poster);
-			Shortlisted s = api.shortlisted(poster, gig, "S" + round);
+			TestAccount roundPoster = accounts.create(); // a Poster may make only 20 shortlist actions a day
+			UUID gig = api.openGig(roundPoster);
+			Shortlisted s = api.shortlisted(roundPoster, gig, "S" + round);
 
 			List<Callable<String>> tasks = List.of(() -> run(() -> hires.start(s.talent().id(), s.application())),
-					() -> run(() -> shortlists.remove(poster.id(), s.application())));
+					() -> run(() -> shortlists.remove(roundPoster.id(), s.application())));
 			List<String> results = Concurrently.runAll(tasks);
 
 			boolean removed = jdbc.sql("SELECT removed_at IS NOT NULL FROM hiring.shortlist_entry WHERE application_id = :id").param("id", s.application())
