@@ -47,6 +47,17 @@ public class AccountRepository {
 		return true;
 	}
 
+	/** One query for many accounts; accounts without a (non-blank) first name are left out. */
+	public java.util.Map<UUID, String> findFirstNames(java.util.Collection<UUID> accountIds) {
+		java.util.Map<UUID, String> names = new java.util.HashMap<>();
+		accounts.findAllById(accountIds).forEach(a -> {
+			if (a.getFirstName() != null && !a.getFirstName().isBlank()) {
+				names.put(a.getId(), a.getFirstName());
+			}
+		});
+		return names;
+	}
+
 	public Optional<String> findFirstName(UUID accountId) {
 		return accounts.findById(accountId).map(Account::getFirstName);
 	}

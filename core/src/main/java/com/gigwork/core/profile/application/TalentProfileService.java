@@ -1,8 +1,10 @@
 package com.gigwork.core.profile.application;
 
 import java.time.Clock;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -12,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.gigwork.core.identity.AccountNames;
+import com.gigwork.core.profile.ApplicantProfile;
+import com.gigwork.core.profile.TalentEligibility;
 import com.gigwork.core.profile.TalentProfileSummary;
 import com.gigwork.core.profile.TalentProfiles;
 import com.gigwork.core.profile.config.ProfileProperties;
@@ -138,6 +142,38 @@ public class TalentProfileService implements TalentProfiles {
 	@Override
 	public Optional<TalentProfileSummary> summary(UUID accountId) {
 		return store.find(accountId).map(p -> new TalentProfileSummary(p.accountId(), p.status(), p.cityId()));
+	}
+
+	@Override
+	public Optional<TalentEligibility> eligibility(UUID accountId) {
+		return store.eligibility(accountId)
+				.map(e -> new TalentEligibility(e.status(), new HashSet<>(e.categoryIds())));
+	}
+
+	@Override
+	public Map<UUID, ApplicantProfile> applicantProfiles(Collection<UUID> accountIds) {
+		if (accountIds.isEmpty()) {
+			return Map.of();
+		}
+		List<UUID> ids = accountIds.stream().distinct().toList();
+		Map<UUID, String> firstNames = names.firstNames(ids);
+		Map<UUID, ApplicantProfile> result = new java.util.LinkedHashMap<>();
+		for (StoredProfile p : store.findAll(ids)) {
+			if (p.isActive() || "HIDDEN".equals(p.status())) {
+				result.put(p.accountId(), applicant(view(p), firstNames.get(p.accountId())));
+			}
+		}
+		return result;
+	}
+
+	private static ApplicantProfile applicant(ProfileView v, String firstName) {
+		return new ApplicantProfile(v.accountId(), firstName, v.profileType(), v.memberCount(), v.headline(), v.bio(),
+				v.categories().stream().map(c -> new ApplicantProfile.Named(c.id(), c.slug(), c.name())).toList(),
+				v.specialisations().stream()
+						.map(s -> new ApplicantProfile.NamedSpecialisation(s.id(), s.categoryId(), s.slug(), s.name())).toList(),
+				v.languages().stream().map(l -> new ApplicantProfile.Language(l.code(), l.name())).toList(),
+				v.locationSaved() ? new ApplicantProfile.Location(v.locationLabel(), v.cityName()) : null,
+				v.links().stream().map(l -> new ApplicantProfile.Link(l.type(), l.url())).toList());
 	}
 
 	// ---- work section: validation against the rules and Reference Data ----------------------------------------

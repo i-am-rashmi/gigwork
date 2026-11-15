@@ -33,4 +33,10 @@ public class NameService implements AccountNames {
 		return accounts.findFirstName(accountId).filter(name -> !name.isBlank());
 	}
 
+	@Override
+	@Transactional(readOnly = true)
+	public java.util.Map<UUID, String> firstNames(java.util.Collection<UUID> accountIds) {
+		return accounts.findFirstNames(accountIds);
+	}
+
 }

@@ -116,6 +116,33 @@ public class ProfileStore {
 				.param("id", accountId).update();
 	}
 
+	/** Many profiles in a fixed number of queries (the collections are batch-loaded). Unknown IDs are absent. */
+	@Transactional(readOnly = true)
+	public List<StoredProfile> findAll(java.util.Collection<UUID> accountIds) {
+		return profiles.findByAccountIdIn(accountIds).stream().map(TalentProfile::toStored).toList();
+	}
+
+	/** The status and the category IDs of a profile in one query; empty if there is no profile. */
+	@Transactional(readOnly = true)
+	public Optional<Eligibility> eligibility(UUID accountId) {
+		List<Row> rows = jdbc.sql("""
+				SELECT p.status, c.category_id
+				FROM profile.talent_profile p LEFT JOIN profile.talent_category c ON c.account_id = p.account_id
+				WHERE p.account_id = :id""").param("id", accountId)
+				.query((rs, i) -> new Row(rs.getString("status"), rs.getObject("category_id", UUID.class))).list();
+		if (rows.isEmpty()) {
+			return Optional.empty();
+		}
+		return Optional.of(new Eligibility(rows.get(0).status(),
+				rows.stream().map(Row::categoryId).filter(java.util.Objects::nonNull).toList()));
+	}
+
+	private record Row(String status, UUID categoryId) {
+	}
+
+	public record Eligibility(String status, List<UUID> categoryIds) {
+	}
+
 	@Transactional(readOnly = true)
 	public Optional<StoredProfile> find(UUID accountId) {
 		return profiles.findById(accountId).map(TalentProfile::toStored);
