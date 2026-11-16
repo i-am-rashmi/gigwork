@@ -1,0 +1,38 @@
+meta {
+  name: Third account: verify OTP
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/auth/otp/verify
+  body: json
+  auth: none
+}
+
+body:json {
+  {"mobile": "{{thirdMobile}}", "challengeId": "{{thirdChallenge}}", "code": "{{thirdOtp}}"}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("thirdOtp")) {
+    throw new Error("Paste the code from the app log (DEV OTP ...) into the environment variable thirdOtp first");
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar("thirdToken", res.body.accessToken);
+  }
+}
+
+tests {
+  test("logged in", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.accessToken).to.be.a("string");
+  });
+}
+
+docs {
+  Uses thirdOtp from the environment. Codes expire after 5 minutes and work once: request a new one for another run.
+}

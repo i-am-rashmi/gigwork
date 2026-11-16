@@ -1,0 +1,26 @@
+meta {
+  name: Talent shares WhatsApp and call
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/me/contact-methods
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+body:json {
+  {"whatsapp": true, "call": true, "email": false}
+}
+
+tests {
+  test("saved", function () {
+    expect(res.status).to.equal(200);
+
+  });
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Paused profile: visible to its owner
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/talent/{{talentId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+tests {
+  test("200", function () {
+    expect(res.status).to.equal(200);
+
+  });
+}

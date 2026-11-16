@@ -1,0 +1,26 @@
+meta {
+  name: Poster cancels the FILLED gig
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{baseUrl}}/gigs/{{gigId}}/cancel
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{posterToken}}
+}
+
+body:json {
+  {"reason": "Venue changed"}
+}
+
+tests {
+  test("cancelled", function () {
+    expect(res.status).to.equal(200);
+
+  });
+}

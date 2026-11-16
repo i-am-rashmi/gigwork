@@ -1,0 +1,27 @@
+meta {
+  name: Poster edits the gig: refused while the hire is pending
+  type: http
+  seq: 22
+}
+
+put {
+  url: {{baseUrl}}/gigs/{{gigId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{posterToken}}
+}
+
+body:json {
+  {"title": "Changed", "description": "Candid photography for the mehendi and the wedding day.", "startAt": "{{gigStart}}",
+   "endAt": "{{gigEnd}}", "location": {"point": {"lat": {{lat}}, "lng": {{lng}}}}, "taOffered": true}
+}
+
+tests {
+  test("409 hire pending", function () {
+    expect(res.status).to.equal(409);
+    expect(res.body.title).to.equal("Hire pending");
+  });
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Paused profile: still in the Poster's applicant list
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/gigs/{{gigId}}/applications
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{posterToken}}
+}
+
+tests {
+  test("still listed", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.items[0].profile.firstName).to.equal("Asha");
+  });
+}

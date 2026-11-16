@@ -1,0 +1,26 @@
+meta {
+  name: Poster shortlists, sharing their contact
+  type: http
+  seq: 16
+}
+
+post {
+  url: {{baseUrl}}/applications/{{applicationId}}/shortlist
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{posterToken}}
+}
+
+body:json {
+  {"shareMyContact": true}
+}
+
+tests {
+  test("shortlisted", function () {
+    expect(res.status).to.equal(200);
+
+  });
+}

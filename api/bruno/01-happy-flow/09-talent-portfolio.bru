@@ -1,0 +1,26 @@
+meta {
+  name: Talent profile: portfolio
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/me/talent-profile/portfolio
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+body:json {
+  {"links": ["https://instagram.com/asha"]}
+}
+
+tests {
+  test("saved", function () {
+    expect(res.status).to.equal(200);
+
+  });
+}

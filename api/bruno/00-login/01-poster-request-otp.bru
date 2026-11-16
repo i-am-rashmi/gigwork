@@ -1,0 +1,30 @@
+meta {
+  name: Poster: request OTP
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/otp/request
+  body: json
+  auth: none
+}
+
+body:json {
+  {"mobile": "{{posterMobile}}"}
+}
+
+script:post-response {
+  bru.setVar("posterChallenge", res.body.challengeId);
+}
+
+tests {
+  test("code requested", function () {
+    expect(res.status).to.equal(202);
+
+  });
+}
+
+docs {
+  Then look in the app log for the line `DEV OTP for ... is NNNNNN` (logger gigwork.dev.otp) and paste the six digits into the environment variable **posterOtp** (environment settings, top right).
+}

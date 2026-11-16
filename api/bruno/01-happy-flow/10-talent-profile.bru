@@ -1,0 +1,26 @@
+meta {
+  name: Talent reads own profile
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/me/talent-profile
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+script:post-response {
+  bru.setVar("talentId", res.body.accountId);
+}
+
+tests {
+  test("profile is active", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("ACTIVE");
+  });
+}

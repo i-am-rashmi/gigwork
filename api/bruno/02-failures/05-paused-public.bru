@@ -1,0 +1,18 @@
+meta {
+  name: Paused profile: 404 for a visitor
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/talent/{{talentId}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("404", function () {
+    expect(res.status).to.equal(404);
+
+  });
+}

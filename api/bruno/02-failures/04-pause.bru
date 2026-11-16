@@ -1,0 +1,26 @@
+meta {
+  name: Talent pauses their profile
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/me/talent-profile/visibility
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+body:json {
+  {"hidden": true}
+}
+
+tests {
+  test("paused", function () {
+    expect(res.status).to.equal(200);
+
+  });
+}

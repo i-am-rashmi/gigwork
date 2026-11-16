@@ -1,0 +1,26 @@
+meta {
+  name: Talent cancels the hire with a reason
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/hires/{{hireId}}/cancel
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+body:json {
+  {"reason": "I am ill"}
+}
+
+tests {
+  test("cancelled", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("CANCELLED");
+  });
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Poster views the Talent's contact: not yet
+  type: http
+  seq: 18
+}
+
+get {
+  url: {{baseUrl}}/applications/{{applicationId}}/talent-contact
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{posterToken}}
+}
+
+tests {
+  test("409 CONTACT_NOT_AVAILABLE", function () {
+    expect(res.status).to.equal(409);
+    expect(res.body.code).to.equal("CONTACT_NOT_AVAILABLE");
+  });
+}

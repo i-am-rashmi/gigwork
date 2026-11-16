@@ -1,0 +1,38 @@
+meta {
+  name: Talent: verify OTP
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/auth/otp/verify
+  body: json
+  auth: none
+}
+
+body:json {
+  {"mobile": "{{talentMobile}}", "challengeId": "{{talentChallenge}}", "code": "{{talentOtp}}"}
+}
+
+script:pre-request {
+  if (!bru.getEnvVar("talentOtp")) {
+    throw new Error("Paste the code from the app log (DEV OTP ...) into the environment variable talentOtp first");
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    bru.setVar("talentToken", res.body.accessToken);
+  }
+}
+
+tests {
+  test("logged in", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.accessToken).to.be.a("string");
+  });
+}
+
+docs {
+  Uses talentOtp from the environment. Codes expire after 5 minutes and work once: request a new one for another run.
+}

@@ -1,0 +1,26 @@
+meta {
+  name: Talent applies: refused, busy then
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/gigs/{{gigId}}/applications
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+body:json {
+  {}
+}
+
+tests {
+  test("409 BUSY", function () {
+    expect(res.status).to.equal(409);
+    expect(res.body.code).to.equal("BUSY");
+  });
+}

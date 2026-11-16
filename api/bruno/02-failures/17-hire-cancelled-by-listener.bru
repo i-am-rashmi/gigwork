@@ -1,0 +1,29 @@
+meta {
+  name: The hire was cancelled by the listener
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/hires/{{hireId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+script:pre-request {
+  // the Hiring listener runs just after the gig's own transaction
+  await bru.sleep(1500);
+}
+
+tests {
+  test("cancelled by the Poster", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("CANCELLED");
+      expect(res.body.cancelledBy).to.equal("POSTER");
+      expect(res.body.cancelReason).to.equal("Venue changed");
+  });
+}

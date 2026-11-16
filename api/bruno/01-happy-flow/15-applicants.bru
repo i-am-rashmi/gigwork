@@ -1,0 +1,24 @@
+meta {
+  name: Poster lists the applicants
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/gigs/{{gigId}}/applications
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{posterToken}}
+}
+
+tests {
+  test("one applicant, no contact details", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.items.length).to.equal(1);
+      expect(res.body.items[0].profile.firstName).to.equal("Asha");
+      expect(JSON.stringify(res.body)).to.not.match(/[6-9][0-9]{9}/);
+  });
+}

@@ -1,0 +1,23 @@
+meta {
+  name: Find the photographer category
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/categories
+  body: none
+  auth: none
+}
+
+script:post-response {
+  const c = res.body.find((x) => x.slug === "photographer");
+  bru.setVar("categoryId", c.id);
+}
+
+tests {
+  test("found", function () {
+    expect(res.status).to.equal(200);
+    expect(bru.getVar("categoryId")).to.be.a("string");
+  });
+}

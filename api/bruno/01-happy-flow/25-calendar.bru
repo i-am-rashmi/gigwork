@@ -1,0 +1,24 @@
+meta {
+  name: The booking is in the Talent's calendar
+  type: http
+  seq: 25
+}
+
+get {
+  url: {{baseUrl}}/me/calendar?from={{dayBefore}}&to={{dayAfter}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+tests {
+  test("booking present", function () {
+    expect(res.status).to.equal(200);
+    const bookings = res.body.entries.filter((e) => e.type === "BOOKING");
+      expect(bookings.length).to.equal(1);
+      expect(bookings[0].gigId).to.equal(bru.getVar("gigId"));
+  });
+}

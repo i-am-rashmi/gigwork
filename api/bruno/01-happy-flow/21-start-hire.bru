@@ -1,0 +1,28 @@
+meta {
+  name: Poster starts a hire
+  type: http
+  seq: 21
+}
+
+post {
+  url: {{baseUrl}}/applications/{{applicationId}}/hire
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{posterToken}}
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar("hireId", res.body.id);
+  }
+}
+
+tests {
+  test("pending hire", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.status).to.equal("PENDING");
+  });
+}
