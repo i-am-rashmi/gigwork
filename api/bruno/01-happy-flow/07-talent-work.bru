@@ -1,0 +1,27 @@
+meta {
+  name: Talent profile: work
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/me/talent-profile/work
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+body:json {
+  {"profileType": "INDIVIDUAL", "memberCount": null, "headline": "Wedding storyteller", "bio": "Candid and warm.",
+   "categoryIds": ["{{categoryId}}"], "specialisationIds": [], "languageCodes": []}
+}
+
+tests {
+  test("saved", function () {
+    expect(res.status).to.equal(200);
+
+  });
+}

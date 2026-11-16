@@ -1,0 +1,26 @@
+meta {
+  name: Poster sets a name
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/me/name
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{posterToken}}
+}
+
+body:json {
+  {"firstName": "Priya"}
+}
+
+tests {
+  test("saved", function () {
+    expect(res.status).to.equal(200);
+
+  });
+}

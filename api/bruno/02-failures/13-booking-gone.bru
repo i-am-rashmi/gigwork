@@ -1,0 +1,22 @@
+meta {
+  name: The booking is gone from the calendar
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/me/calendar?from={{dayBefore}}&to={{dayAfter}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+tests {
+  test("no booking", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.entries.filter((e) => e.type === "BOOKING").length).to.equal(0);
+  });
+}

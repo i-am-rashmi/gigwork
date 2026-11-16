@@ -1,0 +1,26 @@
+meta {
+  name: Talent consents to share
+  type: http
+  seq: 19
+}
+
+put {
+  url: {{baseUrl}}/applications/{{applicationId}}/shortlist/consent
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+body:json {
+  {"consent": true}
+}
+
+tests {
+  test("consented", function () {
+    expect(res.status).to.equal(200);
+
+  });
+}

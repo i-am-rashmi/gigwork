@@ -1,0 +1,40 @@
+meta {
+  name: Talent adds a busy block (inside the gig's time)
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/me/busy-blocks
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+body:json {
+  {"start": "{{busyStart}}", "end": "{{busyEnd}}"}
+}
+
+script:pre-request {
+  // a random day 3..60 days ahead, so repeated runs never collide with earlier gigs or bookings
+  const start = new Date(Date.now() + (3 + Math.floor(Math.random() * 58)) * 86400000);
+  start.setUTCMinutes(0, 0, 0);
+  const iso = (d) => d.toISOString().replace(/\.\d+Z$/, "Z");
+  bru.setVar("gigStart", iso(start));
+  bru.setVar("gigEnd", iso(new Date(start.getTime() + 8 * 3600000)));
+  bru.setVar("busyStart", iso(new Date(start.getTime() + 1 * 3600000)));
+  bru.setVar("busyEnd", iso(new Date(start.getTime() + 3 * 3600000)));
+  bru.setVar("gigDay", start.toISOString().slice(0, 10));
+  bru.setVar("dayBefore", new Date(start.getTime() - 86400000).toISOString().slice(0, 10));
+  bru.setVar("dayAfter", new Date(start.getTime() + 86400000).toISOString().slice(0, 10));
+}
+
+tests {
+  test("created", function () {
+    expect(res.status).to.equal(201);
+
+  });
+}

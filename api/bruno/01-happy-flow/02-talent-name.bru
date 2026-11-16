@@ -1,0 +1,26 @@
+meta {
+  name: Talent sets a name
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/me/name
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+body:json {
+  {"firstName": "Asha"}
+}
+
+tests {
+  test("saved", function () {
+    expect(res.status).to.equal(200);
+
+  });
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Talent views the Poster's contact
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/applications/{{applicationId}}/poster-contact
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+tests {
+  test("visible", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.mobile).to.be.a("string");
+  });
+}

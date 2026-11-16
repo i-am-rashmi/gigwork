@@ -1,0 +1,26 @@
+meta {
+  name: Third account views the Talent's contact: not found
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/applications/{{applicationId}}/talent-contact
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{thirdToken}}
+}
+
+tests {
+  test("404", function () {
+    expect(res.status).to.equal(404);
+
+  });
+}
+
+docs {
+  Needs the third login (00-login, requests 05 and 06).
+}

@@ -1,0 +1,32 @@
+meta {
+  name: Talent applies, acknowledging busy
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/gigs/{{gigId}}/applications
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+body:json {
+  {"acknowledgeBusy": true}
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar("applicationId", res.body.id);
+  }
+}
+
+tests {
+  test("applied", function () {
+    expect(res.status).to.equal(201);
+
+  });
+}

@@ -1,0 +1,34 @@
+meta {
+  name: Poster publishes a gig
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/gigs
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{posterToken}}
+}
+
+body:json {
+  {"categoryId": "{{categoryId}}", "workMode": "ON_SITE", "title": "Photographer for a two-day wedding",
+   "description": "Candid photography for the mehendi and the wedding day.", "startAt": "{{gigStart}}", "endAt": "{{gigEnd}}",
+   "location": {"point": {"lat": {{lat}}, "lng": {{lng}}}}, "taOffered": true}
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setVar("gigId", res.body.id);
+  }
+}
+
+tests {
+  test("published", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.status).to.equal("OPEN");
+  });
+}

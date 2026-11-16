@@ -1,0 +1,22 @@
+meta {
+  name: Talent withdraws the application: refused
+  type: http
+  seq: 26
+}
+
+post {
+  url: {{baseUrl}}/applications/{{applicationId}}/withdraw
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{talentToken}}
+}
+
+tests {
+  test("refused", function () {
+    expect(res.status).to.equal(409);
+
+  });
+}

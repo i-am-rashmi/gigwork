@@ -1,0 +1,23 @@
+meta {
+  name: Logged-in user sees the name and the links
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/talent/{{talentId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{posterToken}}
+}
+
+tests {
+  test("full view", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.firstName).to.equal("Asha");
+      expect(res.body.portfolio[0].url).to.be.a("string");
+  });
+}
