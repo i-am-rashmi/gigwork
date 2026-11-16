@@ -6,6 +6,7 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true   # http://localhost:8080/swagger-ui.html
+    persist-authorization: true   # keeps the bearer token across page reloads
 
 gigwork:
   identity:
